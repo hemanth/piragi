@@ -16,7 +16,7 @@ That's it. Built-in vector store, embeddings, citations, and auto-updates. Free 
 ## Installation
 
 ```bash
-pip install ragi
+pip install piragi
 
 # Optional: Install Ollama for local LLM
 curl -fsSL https://ollama.com/install.sh | sh

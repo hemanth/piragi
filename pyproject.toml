@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ragi"
+name = "piragi"
 version = "0.1.0"
-description = "Minimalist RAG library with auto-chunking, embeddings, and smart citations"
+description = "The best RAG interface yet - Built-in vector store, embeddings, citations, and auto-updates"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
