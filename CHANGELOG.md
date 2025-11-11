@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-01-10
+
+### Changed
+- Renamed package module from `ragi` to `piragi`
+- Import is now `from piragi import Ragi` (class name stays `Ragi`)
+- Updated default persist directory from `.ragi` to `.piragi`
+
 ## [0.1.0] - 2025-01-10
 
 ### Added
@@ -32,4 +39,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Citations** - Every answer includes ranked source citations
 - **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
 
+[0.1.1]: https://github.com/hemanth/ragi/releases/tag/v0.1.1
 [0.1.0]: https://github.com/hemanth/ragi/releases/tag/v0.1.0

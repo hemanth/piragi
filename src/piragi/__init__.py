@@ -24,5 +24,5 @@ Example:
 from .core import Ragi
 from .types import Answer, Citation
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = ["Ragi", "Answer", "Citation"]
