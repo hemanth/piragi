@@ -70,9 +70,10 @@ class Chunker:
                 # Save previous section if it exists
                 if current_section:
                     sections.append("\n".join(current_section))
-                current_section = [line]
-            else:
-                current_section.append(line)
+                    current_section = []
+
+            # Always add the line to current section (including headers)
+            current_section.append(line)
 
         # Add the last section
         if current_section:

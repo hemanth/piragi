@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2025-01-12
+
+### Fixed
+- Critical chunking bug where markdown headers were creating empty chunks
+- Header-only chunks causing poor retrieval quality and empty citations
+- Added minimum chunk length filter (100 chars) to filter out headers/navigation
+
+### Changed
+- Improved chunking logic to keep headers with their content instead of splitting them
+- Better search quality by filtering out short, low-value chunks
+
 ## [0.1.4] - 2025-01-10
 
 ### Added
@@ -80,6 +91,7 @@ config = {
 - **Smart Citations** - Every answer includes ranked source citations
 - **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
 
+[0.1.5]: https://github.com/hemanth/ragi/releases/tag/v0.1.5
 [0.1.4]: https://github.com/hemanth/ragi/releases/tag/v0.1.4
 [0.1.3]: https://github.com/hemanth/ragi/releases/tag/v0.1.3
 [0.1.2]: https://github.com/hemanth/ragi/releases/tag/v0.1.2

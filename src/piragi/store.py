@@ -96,6 +96,7 @@ class VectorStore:
         query_embedding: List[float],
         top_k: int = 5,
         filters: Optional[Dict[str, Any]] = None,
+        min_chunk_length: int = 100,
     ) -> List[Citation]:
         """
         Search for similar chunks.
@@ -104,6 +105,7 @@ class VectorStore:
             query_embedding: Query vector
             top_k: Number of results to return
             filters: Optional metadata filters
+            min_chunk_length: Minimum chunk length to return (filters out headers/navigation)
 
         Returns:
             List of citations
@@ -111,8 +113,11 @@ class VectorStore:
         if self.table is None:
             return []
 
+        # Request more results to account for filtering
+        search_limit = top_k * 3  # Get 3x to ensure we have enough after filtering
+
         # Build query
-        query = self.table.search(query_embedding).limit(top_k)
+        query = self.table.search(query_embedding).limit(search_limit)
 
         # Apply filters if provided
         if filters:
@@ -127,16 +132,26 @@ class VectorStore:
         # Execute search
         results = query.to_list()
 
-        # Convert to citations
+        # Convert to citations and filter out short chunks
         citations = []
         for result in results:
+            chunk_text = result["text"]
+
+            # Skip chunks that are too short (usually headers/navigation)
+            if len(chunk_text) < min_chunk_length:
+                continue
+
             citation = Citation(
                 source=result["source"],
-                chunk=result["text"],
+                chunk=chunk_text,
                 score=1.0 - result["_distance"],  # Convert distance to similarity score
                 metadata=result["metadata"],
             )
             citations.append(citation)
+
+            # Stop once we have enough results
+            if len(citations) >= top_k:
+                break
 
         return citations
 
