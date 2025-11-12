@@ -54,7 +54,7 @@ class Ragi:
                     - base_url: API base URL (default: "http://localhost:11434/v1")
                     - api_key: API key (default: "not-needed")
                 - embedding: Embedding configuration
-                    - model: Model name (default: "nvidia/llama-embed-nemotron-8b")
+                    - model: Model name (default: "all-mpnet-base-v2")
                     - device: Device to use for local models (default: None for auto-detect)
                     - base_url: API base URL for remote embeddings (optional)
                     - api_key: API key for remote embeddings (optional)
@@ -98,7 +98,7 @@ class Ragi:
         # Embeddings
         embed_cfg = cfg.get("embedding", {})
         self.embedder = EmbeddingGenerator(
-            model=embed_cfg.get("model", "nvidia/llama-embed-nemotron-8b"),
+            model=embed_cfg.get("model", "all-mpnet-base-v2"),
             device=embed_cfg.get("device"),
             base_url=embed_cfg.get("base_url"),
             api_key=embed_cfg.get("api_key"),

@@ -67,7 +67,9 @@ config = {
         "base_url": "http://localhost:11434/v1"
     },
     "embedding": {
-        "model": "nvidia/llama-embed-nemotron-8b"
+        "model": "all-mpnet-base-v2"  # ~420MB, good quality
+        # For max quality: "nvidia/llama-embed-nemotron-8b" (~8GB)
+        # For minimal: "all-MiniLM-L6-v2" (~90MB)
     },
     "auto_update": {
         "enabled": True,
