@@ -113,6 +113,9 @@ class Ragi:
             model=llm_cfg.get("model", "llama3.2"),
             api_key=llm_cfg.get("api_key"),
             base_url=llm_cfg.get("base_url"),
+            temperature=llm_cfg.get("temperature", 0.1),
+            enable_reranking=llm_cfg.get("enable_reranking", True),
+            enable_query_expansion=llm_cfg.get("enable_query_expansion", True),
         )
 
         # State for filtering
@@ -208,20 +211,39 @@ class Ragi:
         Returns:
             Answer with citations
         """
-        # Generate query embedding
-        query_embedding = self.embedder.embed_query(query)
+        # Expand query if enabled
+        query_variations = self.retriever.expand_query(query)
 
-        # Search for relevant chunks
-        citations = self.store.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            filters=self._filters,
-        )
+        # Search with all query variations and merge results
+        all_citations = []
+        seen_chunks = set()
+
+        for query_var in query_variations:
+            # Generate query embedding
+            query_embedding = self.embedder.embed_query(query_var)
+
+            # Search for relevant chunks
+            citations = self.store.search(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                filters=self._filters,
+            )
+
+            # Add unique citations
+            for citation in citations:
+                chunk_id = (citation.source, citation.chunk[:100])  # Use source + chunk preview as ID
+                if chunk_id not in seen_chunks:
+                    seen_chunks.add(chunk_id)
+                    all_citations.append(citation)
+
+        # Sort by score and take top_k
+        all_citations.sort(key=lambda c: c.score, reverse=True)
+        final_citations = all_citations[:top_k]
 
         # Generate answer
         answer = self.retriever.generate_answer(
             query=query,
-            citations=citations,
+            citations=final_citations,
             system_prompt=system_prompt,
         )
 

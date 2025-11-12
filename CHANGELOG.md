@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-01-10
+
+### Added
+- Query expansion: Automatically generates query variations for better retrieval
+- Result reranking: Combines vector similarity with keyword matching for better relevance
+- Configurable temperature for LLM responses (default: 0.1 for more focused answers)
+
+### Changed
+- Improved system prompt for more grounded, accurate responses
+- Lower default temperature (0.3 → 0.1) for more deterministic answers
+- Better citation quality through reranking
+
+### Configuration
+New LLM config options:
+```python
+config = {
+    "llm": {
+        "temperature": 0.1,  # Control randomness (0.0-1.0)
+        "enable_reranking": True,  # Rerank results
+        "enable_query_expansion": True  # Expand queries
+    }
+}
+```
+
 ## [0.1.3] - 2025-01-10
 
 ### Fixed
@@ -56,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Citations** - Every answer includes ranked source citations
 - **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
 
+[0.1.4]: https://github.com/hemanth/ragi/releases/tag/v0.1.4
 [0.1.3]: https://github.com/hemanth/ragi/releases/tag/v0.1.3
 [0.1.2]: https://github.com/hemanth/ragi/releases/tag/v0.1.2
 [0.1.1]: https://github.com/hemanth/ragi/releases/tag/v0.1.1
