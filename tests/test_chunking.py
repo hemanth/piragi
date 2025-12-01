@@ -2,8 +2,8 @@
 
 import pytest
 
-from ragi.chunking import Chunker
-from ragi.types import Document
+from piragi.chunking import Chunker
+from piragi.types import Document
 
 
 def test_chunk_small_document():

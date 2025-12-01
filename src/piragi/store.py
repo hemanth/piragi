@@ -5,44 +5,75 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import lancedb
-from lancedb.pydantic import LanceModel, Vector
+import pyarrow as pa
 
 from .types import Chunk, Citation
 
 
-class ChunkModel(LanceModel):
-    """LanceDB schema for chunks."""
+# Common embedding model dimensions
+EMBEDDING_DIMENSIONS = {
+    "all-mpnet-base-v2": 768,
+    "all-MiniLM-L6-v2": 384,
+    "all-MiniLM-L12-v2": 384,
+    "nvidia/llama-embed-nemotron-8b": 4096,
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+    "BAAI/bge-small-en-v1.5": 384,
+    "BAAI/bge-base-en-v1.5": 768,
+    "BAAI/bge-large-en-v1.5": 1024,
+}
 
-    text: str
-    source: str
-    chunk_index: int
-    metadata: Dict[str, Any]
-    vector: Vector(4096)  # nvidia/llama-embed-nemotron-8b dimension
 
+def get_embedding_dimension(model_name: str) -> int:
+    """
+    Get the embedding dimension for a model.
 
-class SourceMetadata(LanceModel):
-    """Metadata for tracking source changes."""
+    Args:
+        model_name: Name of the embedding model
 
-    source: str  # File path or URL
-    last_checked: float  # Unix timestamp
-    content_hash: str  # SHA256 hash of content
-    mtime: Optional[float] = None  # File modification time (for files)
-    etag: Optional[str] = None  # HTTP ETag (for URLs)
-    last_modified: Optional[str] = None  # HTTP Last-Modified (for URLs)
-    check_interval: float = 300.0  # Seconds between checks (default: 5 min)
+    Returns:
+        Embedding dimension
+    """
+    # Check exact match first
+    if model_name in EMBEDDING_DIMENSIONS:
+        return EMBEDDING_DIMENSIONS[model_name]
+
+    # Check partial match (for paths like sentence-transformers/all-mpnet-base-v2)
+    for key, dim in EMBEDDING_DIMENSIONS.items():
+        if key in model_name or model_name.endswith(key):
+            return dim
+
+    # Default to 768 (common dimension)
+    return 768
 
 
 class VectorStore:
-    """Vector store using LanceDB."""
+    """Vector store using LanceDB with dynamic vector dimensions."""
 
-    def __init__(self, persist_dir: str = ".ragi") -> None:
+    def __init__(
+        self,
+        persist_dir: str = ".piragi",
+        embedding_model: str = "all-mpnet-base-v2",
+        vector_dimension: Optional[int] = None,
+    ) -> None:
         """
         Initialize the vector store.
 
         Args:
             persist_dir: Directory to persist the vector database
+            embedding_model: Name of embedding model (used to infer dimension)
+            vector_dimension: Explicit vector dimension (overrides model inference)
         """
         self.persist_dir = persist_dir
+        self.embedding_model = embedding_model
+
+        # Determine vector dimension
+        if vector_dimension is not None:
+            self.vector_dimension = vector_dimension
+        else:
+            self.vector_dimension = get_embedding_dimension(embedding_model)
+
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
 
         self.db = lancedb.connect(persist_dir)
@@ -51,9 +82,18 @@ class VectorStore:
         self.table: Optional[Any] = None
         self.metadata_table: Optional[Any] = None
 
+        # Track all chunk texts for hybrid search
+        self._chunk_texts: List[str] = []
+
         # Initialize tables if they exist
         if self.table_name in self.db.table_names():
             self.table = self.db.open_table(self.table_name)
+            # Load existing chunk texts
+            try:
+                results = self.table.to_pandas()
+                self._chunk_texts = results["text"].tolist()
+            except Exception:
+                pass
 
         if self.metadata_table_name in self.db.table_names():
             self.metadata_table = self.db.open_table(self.metadata_table_name)
@@ -85,11 +125,23 @@ class VectorStore:
             for chunk in chunks
         ]
 
+        # Track chunk texts for hybrid search
+        self._chunk_texts.extend([chunk.text for chunk in chunks])
+
         # Create or update table
         if self.table is None:
             self.table = self.db.create_table(self.table_name, data=data, mode="overwrite")
         else:
             self.table.add(data)
+
+    def get_all_chunk_texts(self) -> List[str]:
+        """
+        Get all chunk texts for hybrid search indexing.
+
+        Returns:
+            List of all chunk texts
+        """
+        return self._chunk_texts
 
     def search(
         self,

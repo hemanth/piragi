@@ -1,5 +1,6 @@
 """Core Ragi class - the main interface for piragi."""
 
+import logging
 from typing import Any, Dict, List, Optional, Union
 
 from .chunking import Chunker
@@ -10,6 +11,8 @@ from .store import VectorStore
 from .types import Answer, Document
 from .async_updater import AsyncUpdater
 from .change_detection import ChangeDetector
+
+logger = logging.getLogger(__name__)
 
 
 class Ragi:
@@ -61,6 +64,15 @@ class Ragi:
                 - chunk: Chunking configuration
                     - size: Chunk size in tokens (default: 512)
                     - overlap: Overlap in tokens (default: 50)
+                    - strategy: Chunking strategy (default: "fixed")
+                        Options: "fixed", "semantic", "contextual", "hierarchical"
+                - retrieval: Retrieval configuration
+                    - use_hyde: Enable HyDE (default: False)
+                    - use_hybrid_search: Enable BM25 + vector hybrid (default: False)
+                    - use_cross_encoder: Enable cross-encoder reranking (default: False)
+                    - cross_encoder_model: Model for cross-encoder (default: "cross-encoder/ms-marco-MiniLM-L-6-v2")
+                    - vector_weight: Weight for vector similarity in hybrid (default: 0.5)
+                    - bm25_weight: Weight for BM25 in hybrid (default: 0.5)
                 - auto_update: Auto-update configuration (enabled by default)
                     - enabled: Enable background updates (default: True)
                     - interval: Check interval in seconds (default: 300)
@@ -75,47 +87,124 @@ class Ragi:
             ...     "llm": {"model": "gpt-4o-mini", "api_key": "sk-..."}
             ... })
             >>>
-            >>> # Full config
+            >>> # Full advanced config
             >>> kb = Ragi("./docs", config={
             ...     "llm": {"model": "llama3.2"},
             ...     "embedding": {"device": "cuda"},
-            ...     "chunk": {"size": 1024, "overlap": 200}
+            ...     "chunk": {"size": 1024, "strategy": "semantic"},
+            ...     "retrieval": {
+            ...         "use_hyde": True,
+            ...         "use_hybrid_search": True,
+            ...         "use_cross_encoder": True,
+            ...     }
             ... })
         """
         # Initialize config
         cfg = config or {}
 
+        # Store config for later use
+        self._config = cfg
+
         # Initialize components
         self.loader = DocumentLoader()
 
-        # Chunking
+        # Chunking configuration
         chunk_cfg = cfg.get("chunk", {})
-        self.chunker = Chunker(
-            chunk_size=chunk_cfg.get("size", 512),
-            chunk_overlap=chunk_cfg.get("overlap", 50),
-        )
+        chunk_strategy = chunk_cfg.get("strategy", "fixed")
+
+        if chunk_strategy == "semantic":
+            from .semantic_chunking import SemanticChunker
+            self.chunker = SemanticChunker(
+                similarity_threshold=chunk_cfg.get("similarity_threshold", 0.5),
+                min_chunk_size=chunk_cfg.get("min_size", 100),
+                max_chunk_size=chunk_cfg.get("max_size", 2000),
+            )
+        elif chunk_strategy == "contextual":
+            from .semantic_chunking import ContextualChunker
+            llm_cfg = cfg.get("llm", {})
+            self.chunker = ContextualChunker(
+                model=llm_cfg.get("model", "llama3.2"),
+                api_key=llm_cfg.get("api_key"),
+                base_url=llm_cfg.get("base_url"),
+            )
+        elif chunk_strategy == "hierarchical":
+            from .semantic_chunking import HierarchicalChunker
+            self.chunker = HierarchicalChunker(
+                parent_chunk_size=chunk_cfg.get("parent_size", 2000),
+                child_chunk_size=chunk_cfg.get("child_size", 400),
+            )
+            self._use_hierarchical = True
+        else:
+            self.chunker = Chunker(
+                chunk_size=chunk_cfg.get("size", 512),
+                chunk_overlap=chunk_cfg.get("overlap", 50),
+            )
+
+        self._use_hierarchical = chunk_strategy == "hierarchical"
 
         # Embeddings
         embed_cfg = cfg.get("embedding", {})
+        embed_model = embed_cfg.get("model", "all-mpnet-base-v2")
         self.embedder = EmbeddingGenerator(
-            model=embed_cfg.get("model", "all-mpnet-base-v2"),
+            model=embed_model,
             device=embed_cfg.get("device"),
             base_url=embed_cfg.get("base_url"),
             api_key=embed_cfg.get("api_key"),
         )
 
-        # Vector store
-        self.store = VectorStore(persist_dir=persist_dir)
+        # Vector store with correct dimensions
+        self.store = VectorStore(
+            persist_dir=persist_dir,
+            embedding_model=embed_model,
+        )
 
-        # LLM
+        # Retrieval configuration
+        retrieval_cfg = cfg.get("retrieval", {})
+        self._use_hyde = retrieval_cfg.get("use_hyde", False)
+        self._use_hybrid_search = retrieval_cfg.get("use_hybrid_search", False)
+        self._use_cross_encoder = retrieval_cfg.get("use_cross_encoder", False)
+
+        # Initialize advanced retrieval components
+        self._hyde = None
+        self._hybrid_searcher = None
+        self._cross_encoder = None
+
         llm_cfg = cfg.get("llm", {})
+
+        if self._use_hyde:
+            from .query_transform import HyDE
+            self._hyde = HyDE(
+                model=llm_cfg.get("model", "llama3.2"),
+                api_key=llm_cfg.get("api_key"),
+                base_url=llm_cfg.get("base_url"),
+            )
+
+        if self._use_hybrid_search:
+            from .hybrid_search import HybridSearcher
+            self._hybrid_searcher = HybridSearcher(
+                vector_weight=retrieval_cfg.get("vector_weight", 0.5),
+                bm25_weight=retrieval_cfg.get("bm25_weight", 0.5),
+                use_rrf=retrieval_cfg.get("use_rrf", True),
+            )
+
+        if self._use_cross_encoder:
+            from .reranker import CrossEncoderReranker
+            self._cross_encoder = CrossEncoderReranker(
+                model_name=retrieval_cfg.get(
+                    "cross_encoder_model",
+                    "cross-encoder/ms-marco-MiniLM-L-6-v2"
+                ),
+                device=embed_cfg.get("device"),
+            )
+
+        # LLM / Basic retriever
         self.retriever = Retriever(
             model=llm_cfg.get("model", "llama3.2"),
             api_key=llm_cfg.get("api_key"),
             base_url=llm_cfg.get("base_url"),
             temperature=llm_cfg.get("temperature", 0.1),
-            enable_reranking=llm_cfg.get("enable_reranking", True),
-            enable_query_expansion=llm_cfg.get("enable_query_expansion", True),
+            enable_reranking=llm_cfg.get("enable_reranking", True) and not self._use_cross_encoder,
+            enable_query_expansion=llm_cfg.get("enable_query_expansion", True) and not self._use_hyde,
         )
 
         # State for filtering
@@ -158,14 +247,25 @@ class Ragi:
         # Chunk documents
         all_chunks = []
         for doc in documents:
-            chunks = self.chunker.chunk_document(doc)
-            all_chunks.extend(chunks)
+            if self._use_hierarchical:
+                # Hierarchical chunking returns (parents, children)
+                # We store children for retrieval but keep parent context
+                parent_chunks, child_chunks = self.chunker.chunk_document(doc)
+                all_chunks.extend(child_chunks)
+            else:
+                chunks = self.chunker.chunk_document(doc)
+                all_chunks.extend(chunks)
 
         # Generate embeddings
         chunks_with_embeddings = self.embedder.embed_chunks(all_chunks)
 
         # Store in vector database
         self.store.add_chunks(chunks_with_embeddings)
+
+        # Index for hybrid search if enabled
+        if self._use_hybrid_search and self._hybrid_searcher:
+            chunk_texts = self.store.get_all_chunk_texts()
+            self._hybrid_searcher.index_chunks(chunk_texts)
 
         # Register sources for auto-update
         if self._auto_update_enabled and self._updater:
@@ -211,12 +311,34 @@ class Ragi:
         Returns:
             Answer with citations
         """
-        # Expand query if enabled
-        query_variations = self.retriever.expand_query(query)
+        # Validate query
+        if not query or not query.strip():
+            return Answer(
+                text="Please provide a valid question.",
+                citations=[],
+                query=query,
+            )
+
+        # Determine queries to use for retrieval
+        if self._use_hyde and self._hyde:
+            # HyDE: generate hypothetical document and use that for retrieval
+            try:
+                hypothetical_doc = self._hyde.transform_query(query)
+                query_variations = [hypothetical_doc]
+                logger.debug(f"HyDE generated: {hypothetical_doc[:100]}...")
+            except Exception as e:
+                logger.warning(f"HyDE failed: {e}, falling back to regular query")
+                query_variations = self.retriever.expand_query(query)
+        else:
+            # Standard query expansion
+            query_variations = self.retriever.expand_query(query)
 
         # Search with all query variations and merge results
         all_citations = []
         seen_chunks = set()
+
+        # Get more candidates if we're using cross-encoder reranking
+        search_top_k = top_k * 4 if self._use_cross_encoder else top_k
 
         for query_var in query_variations:
             # Generate query embedding
@@ -225,20 +347,52 @@ class Ragi:
             # Search for relevant chunks
             citations = self.store.search(
                 query_embedding=query_embedding,
-                top_k=top_k,
+                top_k=search_top_k,
                 filters=self._filters,
             )
 
             # Add unique citations
             for citation in citations:
-                chunk_id = (citation.source, citation.chunk[:100])  # Use source + chunk preview as ID
+                chunk_id = (citation.source, citation.chunk[:100])
                 if chunk_id not in seen_chunks:
                     seen_chunks.add(chunk_id)
                     all_citations.append(citation)
 
-        # Sort by score and take top_k
-        all_citations.sort(key=lambda c: c.score, reverse=True)
-        final_citations = all_citations[:top_k]
+        # Apply hybrid search if enabled
+        if self._use_hybrid_search and self._hybrid_searcher:
+            try:
+                all_citations = self._hybrid_searcher.search(
+                    query=query,  # Use original query for BM25
+                    vector_citations=all_citations,
+                    top_k=search_top_k,
+                )
+            except Exception as e:
+                logger.warning(f"Hybrid search failed: {e}")
+                # Continue with vector-only results
+
+        # Apply cross-encoder reranking if enabled
+        if self._use_cross_encoder and self._cross_encoder:
+            try:
+                all_citations = self._cross_encoder.rerank(
+                    query=query,  # Use original query for reranking
+                    citations=all_citations,
+                    top_k=top_k,
+                )
+            except Exception as e:
+                logger.warning(f"Cross-encoder reranking failed: {e}")
+                # Fall back to score-based sorting
+                all_citations.sort(key=lambda c: c.score, reverse=True)
+                all_citations = all_citations[:top_k]
+        else:
+            # Sort by score and take top_k
+            all_citations.sort(key=lambda c: c.score, reverse=True)
+            all_citations = all_citations[:top_k]
+
+        final_citations = all_citations
+
+        # For hierarchical chunks, expand to parent context
+        if self._use_hierarchical:
+            final_citations = self._expand_to_parent_context(final_citations)
 
         # Generate answer
         answer = self.retriever.generate_answer(
@@ -251,6 +405,35 @@ class Ragi:
         self._filters = None
 
         return answer
+
+    def _expand_to_parent_context(self, citations: List) -> List:
+        """
+        Expand child chunks to include parent context.
+
+        For hierarchical chunking, we retrieve using precise child chunks
+        but include the larger parent context for answer generation.
+        """
+        from .types import Citation
+
+        expanded = []
+        for citation in citations:
+            if "parent_text" in citation.metadata:
+                # Replace chunk with parent context
+                expanded.append(
+                    Citation(
+                        source=citation.source,
+                        chunk=citation.metadata["parent_text"],
+                        score=citation.score,
+                        metadata={
+                            k: v for k, v in citation.metadata.items()
+                            if k != "parent_text"
+                        },
+                    )
+                )
+            else:
+                expanded.append(citation)
+
+        return expanded
 
     def filter(self, **kwargs: Any) -> "Ragi":
         """

@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from ragi.loader import DocumentLoader
+from piragi.loader import DocumentLoader
 
 
 def test_load_single_file(sample_text_file):

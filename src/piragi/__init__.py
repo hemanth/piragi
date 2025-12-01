@@ -19,10 +19,52 @@ Example:
     >>>
     >>> # Filter by metadata
     >>> answer = kb.filter(type="documentation").ask("How to configure?")
+    >>>
+    >>> # Advanced retrieval with HyDE, hybrid search, and cross-encoder
+    >>> kb = Ragi("./docs", config={
+    ...     "retrieval": {
+    ...         "use_hyde": True,
+    ...         "use_hybrid_search": True,
+    ...         "use_cross_encoder": True,
+    ...     }
+    ... })
 """
 
 from .core import Ragi
 from .types import Answer, Citation
 
-__version__ = "0.1.5"
-__all__ = ["Ragi", "Answer", "Citation"]
+# Advanced components (optional imports)
+from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
+from .hybrid_search import BM25, HybridSearcher
+from .query_transform import HyDE, QueryExpander, MultiQueryRetriever, StepBackPrompting
+from .semantic_chunking import (
+    SemanticChunker,
+    ContextualChunker,
+    PropositionChunker,
+    HierarchicalChunker,
+)
+
+__version__ = "0.2.1"
+__all__ = [
+    # Core
+    "Ragi",
+    "Answer",
+    "Citation",
+    # Reranking
+    "CrossEncoderReranker",
+    "TFIDFReranker",
+    "HybridReranker",
+    # Hybrid search
+    "BM25",
+    "HybridSearcher",
+    # Query transformation
+    "HyDE",
+    "QueryExpander",
+    "MultiQueryRetriever",
+    "StepBackPrompting",
+    # Chunking strategies
+    "SemanticChunker",
+    "ContextualChunker",
+    "PropositionChunker",
+    "HierarchicalChunker",
+]

@@ -1,6 +1,6 @@
 """Tests for type definitions."""
 
-from ragi.types import Answer, Citation, Chunk, Document
+from piragi.types import Answer, Citation, Chunk, Document
 
 
 def test_citation_creation():
