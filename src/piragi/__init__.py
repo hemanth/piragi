@@ -43,13 +43,24 @@ from .semantic_chunking import (
     PropositionChunker,
     HierarchicalChunker,
 )
+from .stores import (
+    VectorStoreProtocol,
+    LanceStore,
+    PostgresStore,
+    PineconeStore,
+)
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 __all__ = [
     # Core
     "Ragi",
     "Answer",
     "Citation",
+    # Vector stores
+    "VectorStoreProtocol",
+    "LanceStore",
+    "PostgresStore",
+    "PineconeStore",
     # Reranking
     "CrossEncoderReranker",
     "TFIDFReranker",

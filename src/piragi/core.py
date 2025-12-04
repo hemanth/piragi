@@ -7,7 +7,7 @@ from .chunking import Chunker
 from .embeddings import EmbeddingGenerator
 from .loader import DocumentLoader
 from .retrieval import Retriever
-from .store import VectorStore
+from .stores import VectorStoreProtocol, create_store
 from .types import Answer, Document
 from .async_updater import AsyncUpdater
 from .change_detection import ChangeDetector
@@ -44,13 +44,14 @@ class Ragi:
         sources: Union[str, List[str], None] = None,
         persist_dir: str = ".piragi",
         config: Optional[Dict[str, Any]] = None,
+        store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
     ) -> None:
         """
         Initialize Ragi with optional document sources.
 
         Args:
             sources: File paths, URLs, or glob patterns to load
-            persist_dir: Directory to persist vector database
+            persist_dir: Directory to persist vector database (used if store is None)
             config: Configuration dict with optional sections:
                 - llm: LLM configuration
                     - model: Model name (default: "llama3.2")
@@ -77,6 +78,11 @@ class Ragi:
                     - enabled: Enable background updates (default: True)
                     - interval: Check interval in seconds (default: 300)
                     - workers: Number of background workers (default: 2)
+            store: Vector store backend. Can be:
+                - None: Use default LanceDB with persist_dir
+                - str: URI (e.g., "s3://bucket/path", "postgres://...", "pinecone://...")
+                - dict: Store config {"type": "pinecone", "api_key": "...", ...}
+                - VectorStoreProtocol: Custom store implementation
 
         Examples:
             >>> # Use defaults
@@ -86,6 +92,16 @@ class Ragi:
             >>> kb = Ragi("./docs", config={
             ...     "llm": {"model": "gpt-4o-mini", "api_key": "sk-..."}
             ... })
+            >>>
+            >>> # Use S3-backed storage
+            >>> kb = Ragi("./docs", store="s3://my-bucket/indices")
+            >>>
+            >>> # Use PostgreSQL with pgvector
+            >>> kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
+            >>>
+            >>> # Use Pinecone
+            >>> from piragi.stores import PineconeStore
+            >>> kb = Ragi("./docs", store=PineconeStore(api_key="...", index_name="my-index"))
             >>>
             >>> # Full advanced config
             >>> kb = Ragi("./docs", config={
@@ -152,8 +168,9 @@ class Ragi:
             api_key=embed_cfg.get("api_key"),
         )
 
-        # Vector store with correct dimensions
-        self.store = VectorStore(
+        # Vector store - supports multiple backends
+        self.store = create_store(
+            store=store,
             persist_dir=persist_dir,
             embedding_model=embed_model,
         )

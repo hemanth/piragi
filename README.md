@@ -34,6 +34,7 @@ ollama pull llama3.2
 - **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
 - **Advanced Retrieval** - HyDE, hybrid search, cross-encoder reranking
 - **Semantic Chunking** - Context-aware, proposition-based, and hierarchical chunking
+- **Pluggable Storage** - Local, S3, PostgreSQL, Pinecone, or custom backends
 
 ---
 
@@ -156,6 +157,53 @@ kb = Ragi("./docs", config={"auto_update": {"enabled": False}})
 
 ---
 
+## Custom Storage Backends
+
+Use your own infrastructure for production:
+
+```python
+from piragi import Ragi
+from piragi.stores import PineconeStore, PostgresStore, LanceStore
+
+# S3-backed storage (via LanceDB)
+kb = Ragi("./docs", store="s3://my-bucket/indices")
+
+# PostgreSQL with pgvector
+kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
+
+# Pinecone
+kb = Ragi("./docs", store=PineconeStore(
+    api_key="your-api-key",
+    index_name="my-index"
+))
+
+# Or use URI format
+kb = Ragi("./docs", store="pinecone://my-index?api_key=...")
+```
+
+**Supported backends:**
+- **LanceDB** (default) - Local or S3-backed, zero config
+- **PostgreSQL** - pgvector extension for production databases
+- **Pinecone** - Managed vector database
+
+**Custom stores:**
+
+```python
+from piragi.stores import VectorStoreProtocol
+
+class MyStore:
+    def add_chunks(self, chunks): ...
+    def search(self, query_embedding, top_k=5, filters=None): ...
+    def delete_by_source(self, source): ...
+    def count(self): ...
+    def clear(self): ...
+    def get_all_chunk_texts(self): ...
+
+kb = Ragi("./docs", store=MyStore())
+```
+
+---
+
 ## Retrieval Only (No LLM)
 
 Use piragi as a pure retrieval layer - bring your own LLM:
@@ -185,7 +233,7 @@ Works with LangChain, LlamaIndex, direct API calls, or any framework.
 ## API
 
 ```python
-kb = Ragi(sources, persist_dir=".piragi", config=None)
+kb = Ragi(sources, persist_dir=".piragi", config=None, store=None)
 kb.add("./more-docs")
 kb.ask(query, top_k=5)              # Full RAG (retrieval + LLM)
 kb.retrieve(query, top_k=5)         # Retrieval only (no LLM)
@@ -201,6 +249,8 @@ kb.clear()
 
 ```python
 from piragi import (
+    # Vector stores
+    VectorStoreProtocol, LanceStore, PostgresStore, PineconeStore,
     # Reranking
     CrossEncoderReranker, TFIDFReranker, HybridReranker,
     # Hybrid search
