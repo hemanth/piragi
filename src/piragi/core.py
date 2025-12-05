@@ -8,7 +8,7 @@ from .embeddings import EmbeddingGenerator
 from .loader import DocumentLoader
 from .retrieval import Retriever
 from .stores import VectorStoreProtocol, create_store
-from .types import Answer, Document
+from .types import Answer, Chunk, Document, ChunkHook, DocumentHook
 from .async_updater import AsyncUpdater
 from .change_detection import ChangeDetector
 
@@ -78,6 +78,13 @@ class Ragi:
                     - enabled: Enable background updates (default: True)
                     - interval: Check interval in seconds (default: 300)
                     - workers: Number of background workers (default: 2)
+                - hooks: Processing hooks for custom transformations
+                    - post_load: Called after loading documents, before chunking
+                        Signature: (docs: List[Document]) -> List[Document]
+                    - post_chunk: Called after chunking, before embedding
+                        Signature: (chunks: List[Chunk]) -> List[Chunk]
+                    - post_embed: Called after embedding, before storage
+                        Signature: (chunks: List[Chunk]) -> List[Chunk]
             store: Vector store backend. Can be:
                 - None: Use default LanceDB with persist_dir
                 - str: URI (e.g., "s3://bucket/path", "postgres://...", "pinecone://...")
@@ -227,6 +234,12 @@ class Ragi:
         # State for filtering
         self._filters: Optional[Dict[str, Any]] = None
 
+        # Processing hooks
+        hooks_cfg = cfg.get("hooks", {})
+        self._post_load_hook: Optional[DocumentHook] = hooks_cfg.get("post_load")
+        self._post_chunk_hook: Optional[ChunkHook] = hooks_cfg.get("post_chunk")
+        self._post_embed_hook: Optional[ChunkHook] = hooks_cfg.get("post_embed")
+
         # Auto-update setup
         auto_update_cfg = cfg.get("auto_update", {})
         self._auto_update_enabled = auto_update_cfg.get("enabled", True)
@@ -261,6 +274,10 @@ class Ragi:
         # Load documents
         documents = self.loader.load(sources)
 
+        # Hook: post_load - transform documents before chunking
+        if self._post_load_hook:
+            documents = self._post_load_hook(documents)
+
         # Chunk documents
         all_chunks = []
         for doc in documents:
@@ -273,8 +290,16 @@ class Ragi:
                 chunks = self.chunker.chunk_document(doc)
                 all_chunks.extend(chunks)
 
+        # Hook: post_chunk - transform chunks before embedding
+        if self._post_chunk_hook:
+            all_chunks = self._post_chunk_hook(all_chunks)
+
         # Generate embeddings
         chunks_with_embeddings = self.embedder.embed_chunks(all_chunks)
+
+        # Hook: post_embed - transform chunks before storage (e.g., entity extraction)
+        if self._post_embed_hook:
+            chunks_with_embeddings = self._post_embed_hook(chunks_with_embeddings)
 
         # Store in vector database
         self.store.add_chunks(chunks_with_embeddings)
