@@ -25,6 +25,7 @@ pip install piragi[s3]       # S3 support
 pip install piragi[gcs]      # Google Cloud Storage
 pip install piragi[azure]    # Azure Blob Storage
 pip install piragi[crawler]  # Recursive web crawling
+pip install piragi[graph]    # Knowledge graph
 pip install piragi[postgres] # PostgreSQL/pgvector
 pip install piragi[pinecone] # Pinecone
 pip install piragi[supabase] # Supabase
@@ -42,6 +43,7 @@ pip install piragi[all]      # Everything
 - **Pluggable Stores** - LanceDB, PostgreSQL, Pinecone, Supabase, or custom
 - **Advanced Retrieval** - HyDE, hybrid search, cross-encoder reranking
 - **Semantic Chunking** - Context-aware and hierarchical chunking
+- **Knowledge Graph** - Entity/relationship extraction for better answers
 
 ## Quick Start
 
@@ -158,6 +160,26 @@ kb = Ragi("./docs", config={"chunk": {"strategy": "hierarchical"}})
 # Contextual - LLM-generated context per chunk
 kb = Ragi("./docs", config={"chunk": {"strategy": "contextual"}})
 ```
+
+## Knowledge Graph
+
+Extract entities and relationships for better multi-hop reasoning:
+
+```python
+# Enable with single flag
+kb = Ragi("./docs", graph=True)
+
+# Automatic - extracts entities/relationships during ingestion
+# Uses them to augment retrieval for relationship questions
+answer = kb.ask("Who reports to Alice?")
+
+# Direct graph access
+kb.graph.entities()           # ["alice", "bob", "project x"]
+kb.graph.neighbors("alice")   # ["bob", "engineering team"]
+kb.graph.triples()            # [("alice", "manages", "bob"), ...]
+```
+
+Requires: `pip install piragi[graph]`
 
 ## Configuration
 

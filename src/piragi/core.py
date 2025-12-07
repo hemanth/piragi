@@ -45,6 +45,7 @@ class Ragi:
         persist_dir: str = ".piragi",
         config: Optional[Dict[str, Any]] = None,
         store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
+        graph: bool = False,
     ) -> None:
         """
         Initialize Ragi with optional document sources.
@@ -83,6 +84,8 @@ class Ragi:
                 - str: URI (e.g., "s3://bucket/path", "postgres://...", "pinecone://...")
                 - dict: Store config {"type": "pinecone", "api_key": "...", ...}
                 - VectorStoreProtocol: Custom store implementation
+            graph: Enable knowledge graph for entity/relationship extraction (default: False)
+                Requires: pip install piragi[graph]
 
         Examples:
             >>> # Use defaults
@@ -244,6 +247,16 @@ class Ragi:
             )
             self._updater.start()
 
+        # Knowledge graph setup
+        self._use_graph = graph
+        self._graph = None
+
+        if graph:
+            from .knowledge_graph import KnowledgeGraph
+            import os
+            graph_path = os.path.join(persist_dir, "graph.json")
+            self._graph = KnowledgeGraph(persist_path=graph_path)
+
         # Load initial sources if provided
         if sources:
             self.add(sources)
@@ -278,6 +291,17 @@ class Ragi:
 
         # Store in vector database
         self.store.add_chunks(chunks_with_embeddings)
+
+        # Extract entities and relationships for knowledge graph
+        if self._use_graph and self._graph:
+            llm_cfg = self._config.get("llm", {})
+            for chunk in chunks_with_embeddings:
+                self._graph.extract_and_add(
+                    text=chunk.text,
+                    llm_client=self.retriever._client,
+                    model=llm_cfg.get("model", "llama3.2"),
+                )
+            self._graph.save()
 
         # Index for hybrid search if enabled
         if self._use_hybrid_search and self._hybrid_searcher:
@@ -411,11 +435,24 @@ class Ragi:
         if self._use_hierarchical:
             final_citations = self._expand_to_parent_context(final_citations)
 
+        # Add graph context if enabled
+        graph_context = ""
+        if self._use_graph and self._graph:
+            graph_context = self._graph.to_context(query, max_triples=10)
+
+        # Build system prompt with graph context
+        final_system_prompt = system_prompt
+        if graph_context:
+            if final_system_prompt:
+                final_system_prompt = f"{final_system_prompt}\n\n{graph_context}"
+            else:
+                final_system_prompt = graph_context
+
         # Generate answer
         answer = self.retriever.generate_answer(
             query=query,
             citations=final_citations,
-            system_prompt=system_prompt,
+            system_prompt=final_system_prompt,
         )
 
         # Reset filters after use
@@ -593,6 +630,22 @@ class Ragi:
         """Return the number of chunks in the knowledge base."""
         return self.store.count()
 
+    @property
+    def graph(self):
+        """
+        Access the knowledge graph for direct queries.
+
+        Returns:
+            KnowledgeGraph instance if graph=True was set, None otherwise
+
+        Examples:
+            >>> kb = Ragi("./docs", graph=True)
+            >>> kb.graph.entities()  # List all entities
+            >>> kb.graph.neighbors("Alice")  # Get related entities
+            >>> kb.graph.triples()  # Get all (subject, predicate, object) triples
+        """
+        return self._graph
+
     def refresh(self, sources: Union[str, List[str]]) -> "Ragi":
         """
         Refresh specific sources by deleting old chunks and re-adding.
@@ -640,6 +693,10 @@ class Ragi:
             self._tracked_sources.clear()
 
         self.store.clear()
+
+        # Clear knowledge graph if enabled
+        if self._graph:
+            self._graph.clear()
 
     def __del__(self):
         """Cleanup on deletion."""
