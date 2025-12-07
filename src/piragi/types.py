@@ -1,6 +1,6 @@
 """Type definitions for Ragi."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -52,3 +52,8 @@ class Chunk(BaseModel):
     chunk_index: int = Field(description="Index of chunk in document")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Chunk metadata")
     embedding: Optional[List[float]] = Field(default=None, description="Vector embedding")
+
+
+# Type aliases for hooks
+DocumentHook = Callable[[List["Document"]], List["Document"]]
+ChunkHook = Callable[[List["Chunk"]], List["Chunk"]]
