@@ -44,7 +44,7 @@ class PineconeStore:
         except ImportError:
             raise ImportError(
                 "PineconeStore requires pinecone-client. "
-                "Install with: pip install pinecone-client"
+                "Install with: pip install piragi[pinecone]"
             )
 
         self.api_key = api_key

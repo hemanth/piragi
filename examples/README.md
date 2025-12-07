@@ -1,17 +1,17 @@
-# Ragi Examples
+# Examples
 
-Quick examples demonstrating Ragi features.
+Quick examples demonstrating piragi features.
 
-## Basic Examples
+## Basic
 
 ### quickstart.py
-Basic intro - load documents and ask questions.
+Load documents and ask questions.
 ```bash
 python examples/quickstart.py
 ```
 
 ### ollama_example.py
-Using Ragi with Ollama (free local LLM).
+Using piragi with Ollama (free local LLM).
 ```bash
 python examples/ollama_example.py
 ```
@@ -23,15 +23,15 @@ python examples/code_qa.py
 ```
 
 ### multi_format.py
-Working with multiple document formats (Markdown, JSON, text).
+Working with multiple document formats.
 ```bash
 python examples/multi_format.py
 ```
 
-## Advanced Examples
+## Advanced
 
 ### embedding_options.py
-Different embedding configurations (local vs remote).
+Different embedding configurations.
 ```bash
 python examples/embedding_options.py
 ```
@@ -51,21 +51,27 @@ python examples/auto_update_detection.py
 ## Setup
 
 ```bash
-# Install Ragi
-pip install ragi
+pip install piragi
 
-# Install Ollama (for local LLM)
+# For local LLM
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
+
+# For remote filesystems
+pip install piragi[s3]  # or piragi[gcs], piragi[azure]
 ```
 
 ## Quick Template
 
 ```python
-from ragi import Ragi
+from piragi import Ragi
 
-# Load documents (auto-updates enabled by default)
-kb = Ragi(["./docs", "https://api.example.com/docs"])
+# Load from local, remote, or URLs
+kb = Ragi([
+    "./docs",
+    "s3://bucket/data/**/*.pdf",
+    "https://api.example.com/docs"
+])
 
 # Ask questions
 answer = kb.ask("Your question")

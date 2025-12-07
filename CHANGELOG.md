@@ -5,95 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2025-01-12
-
-### Fixed
-- Critical chunking bug where markdown headers were creating empty chunks
-- Header-only chunks causing poor retrieval quality and empty citations
-- Added minimum chunk length filter (100 chars) to filter out headers/navigation
-
-### Changed
-- Improved chunking logic to keep headers with their content instead of splitting them
-- Better search quality by filtering out short, low-value chunks
-
-## [0.1.4] - 2025-01-10
+## [0.6.0] - 2025-12-06
 
 ### Added
-- Query expansion: Automatically generates query variations for better retrieval
-- Result reranking: Combines vector similarity with keyword matching for better relevance
-- Configurable temperature for LLM responses (default: 0.1 for more focused answers)
+- Knowledge graph support with simple `graph=True` flag
+- LLM-based entity and relationship extraction during ingestion
+- Graph-augmented retrieval for relationship questions
+- Direct graph access: `kb.graph.entities()`, `kb.graph.neighbors()`, `kb.graph.triples()`
+- New optional extra: `piragi[graph]` (requires networkx)
+
+## [0.5.0] - 2025-12-06
+
+### Added
+- Recursive web crawling with `/**` syntax (e.g., `https://docs.example.com/**`)
+- crawl4ai integration for async crawling with JS rendering support
+- New optional extra: `piragi[crawler]`
+
+## [0.4.0] - 2025-12-05
+
+### Added
+- Remote filesystem support via fsspec (S3, GCS, Azure, HDFS, SFTP, FTP)
+- Glob patterns for remote URIs (e.g., `s3://bucket/docs/**/*.pdf`)
+- Supabase vector store backend
+- Optional dependency extras for modular installation
 
 ### Changed
-- Improved system prompt for more grounded, accurate responses
-- Lower default temperature (0.3 → 0.1) for more deterministic answers
-- Better citation quality through reranking
+- All external dependencies are now optional extras:
+  - `piragi[s3]`, `piragi[gcs]`, `piragi[azure]`, `piragi[remote]` for remote filesystems
+  - `piragi[supabase]`, `piragi[pinecone]`, `piragi[postgres]` for vector stores
+  - `piragi[all]` for everything
+- Improved error messages with install hints for missing dependencies
 
-### Configuration
-New LLM config options:
-```python
-config = {
-    "llm": {
-        "temperature": 0.1,  # Control randomness (0.0-1.0)
-        "enable_reranking": True,  # Rerank results
-        "enable_query_expansion": True  # Expand queries
-    }
-}
-```
+## [0.3.0] - 2025-01-15
 
-## [0.1.3] - 2025-01-10
+### Added
+- Supabase vector store integration
+- Pluggable vector store backends (LanceDB, PostgreSQL, Pinecone, Supabase)
+- `retrieve()` method for retrieval-only usage without LLM
+- Advanced retrieval: HyDE, hybrid search, cross-encoder reranking
+- Semantic chunking strategies: semantic, contextual, hierarchical
+
+## [0.2.0] - 2025-01-12
+
+### Added
+- Query expansion for better retrieval
+- Result reranking with keyword matching
+- Configurable LLM temperature
 
 ### Fixed
-- Schema mismatch error when mixing file and URL sources
-- URLs now use consistent metadata schema with files
-
-## [0.1.2] - 2025-01-10
-
-### Changed
-- **BREAKING**: Changed default embedding model from `nvidia/llama-embed-nemotron-8b` (~8GB) to `all-mpnet-base-v2` (~420MB)
-- Prevents memory crashes on standard machines while maintaining good quality
-- Users can still opt into larger models via config
-
-### Fixed
-- Memory exhaustion when processing large websites
-- Crash on Macs with <16GB RAM when loading default embedding model
-
-## [0.1.1] - 2025-01-10
-
-### Changed
-- Renamed package module from `ragi` to `piragi`
-- Import is now `from piragi import Ragi` (class name stays `Ragi`)
-- Updated default persist directory from `.ragi` to `.piragi`
+- Chunking bug creating header-only chunks
+- Schema mismatch between file and URL metadata
 
 ## [0.1.0] - 2025-01-10
 
 ### Added
-- Initial release of piragi
+- Initial release
 - Zero-config RAG with built-in vector store (LanceDB)
 - Universal document support (PDF, Word, Excel, Markdown, Code, URLs, Images, Audio)
 - Auto-chunking with markdown-aware splitting
-- Local embeddings via sentence-transformers (nvidia/llama-embed-nemotron-8b)
-- Remote embeddings via OpenAI-compatible APIs
-- Local LLM via Ollama (llama3.2)
-- OpenAI-compatible LLM support
+- Local embeddings via sentence-transformers
+- Local LLM via Ollama
+- OpenAI-compatible API support
 - Smart citations with relevance scores
 - Metadata filtering
 - Auto-updates with background workers
-- Change detection for files (mtime + hash) and URLs (HTTP HEAD)
-- Concurrent query support
-- Single unified config dict
-- Examples: quickstart, ollama, code_qa, multi_format, embedding_options, update_documents
-- Comprehensive API documentation
 
-### Features
-- **Simple Setup** - Works with free local models out of the box
-- **All Formats** - PDF, Word, Excel, Markdown, Code, URLs, Images, Audio
-- **Auto-Updates** - Background refresh, queries never blocked
-- **Smart Citations** - Every answer includes ranked source citations
-- **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
-
-[0.1.5]: https://github.com/hemanth/ragi/releases/tag/v0.1.5
-[0.1.4]: https://github.com/hemanth/ragi/releases/tag/v0.1.4
-[0.1.3]: https://github.com/hemanth/ragi/releases/tag/v0.1.3
-[0.1.2]: https://github.com/hemanth/ragi/releases/tag/v0.1.2
-[0.1.1]: https://github.com/hemanth/ragi/releases/tag/v0.1.1
-[0.1.0]: https://github.com/hemanth/ragi/releases/tag/v0.1.0
+[0.6.0]: https://github.com/hemanth/piragi/releases/tag/v0.6.0
+[0.5.0]: https://github.com/hemanth/piragi/releases/tag/v0.5.0
+[0.4.0]: https://github.com/hemanth/piragi/releases/tag/v0.4.0
+[0.3.0]: https://github.com/hemanth/piragi/releases/tag/v0.3.0
+[0.2.0]: https://github.com/hemanth/piragi/releases/tag/v0.2.0
+[0.1.0]: https://github.com/hemanth/piragi/releases/tag/v0.1.0

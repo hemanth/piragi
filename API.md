@@ -1,428 +1,264 @@
 # API Reference
 
-Complete API documentation for Ragi.
+## Ragi
 
-## Main Class
-
-### `Ragi`
-
-The main interface for creating and querying RAG systems.
+Main interface for RAG systems.
 
 ```python
-from ragi import Ragi
+from piragi import Ragi
 ```
 
-#### Constructor
+### Constructor
 
 ```python
 Ragi(
     sources: Union[str, List[str], None] = None,
-    persist_dir: str = ".ragi",
+    persist_dir: str = ".piragi",
     config: Optional[Dict[str, Any]] = None,
+    store: Union[str, Dict, VectorStoreProtocol, None] = None,
 )
 ```
 
 **Parameters:**
-- `sources` - File paths, URLs, or glob patterns to load initially
-- `persist_dir` - Directory to persist vector database (default: `.ragi`)
-- `config` - Optional configuration dict with nested sections:
-  - `llm` - LLM configuration:
-    - `model` - Model name (default: `llama3.2`)
-    - `api_key` - API key (default: env `LLM_API_KEY` or `"not-needed"`)
-    - `base_url` - API base URL (default: env `LLM_BASE_URL` or `"http://localhost:11434/v1"`)
-  - `embedding` - Embedding configuration:
-    - `model` - Model name (default: `nvidia/llama-embed-nemotron-8b`)
-    - `device` - Device to use for local models (default: auto-detect)
-    - `base_url` - API base URL for remote embeddings (optional)
-    - `api_key` - API key for remote embeddings (optional, defaults to env `EMBEDDING_API_KEY`)
-  - `chunk` - Chunking configuration:
-    - `size` - Target chunk size in tokens (default: 512)
-    - `overlap` - Number of tokens to overlap (default: 50)
+- `sources` - File paths, URLs, glob patterns, remote URIs (s3://, gs://, az://), or crawl URLs (https://.../**)
+- `persist_dir` - Directory to persist vector database
+- `config` - Configuration dict (see Configuration section)
+- `store` - Vector store backend (URI string, dict, or VectorStoreProtocol instance)
 
 **Examples:**
 ```python
-# Basic initialization (uses free local models)
+# Basic
 kb = Ragi("./docs")
 
-# With public embedding model
+# Remote filesystem
+kb = Ragi("s3://bucket/docs/**/*.pdf")
+
+# Multiple sources
+kb = Ragi(["./docs", "s3://bucket/data", "https://api.example.com"])
+
+# With config
 kb = Ragi("./docs", config={
-    "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
+    "llm": {"model": "gpt-4o-mini", "api_key": "sk-..."},
 })
 
-# Custom Ollama model
-kb = Ragi("./docs", config={
-    "llm": {"model": "mistral"},
-    "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-})
-
-# With OpenAI-compatible API (LLM only, local embeddings)
-kb = Ragi("./docs", config={
-    "llm": {
-        "model": "gpt-4o-mini",
-        "api_key": "sk-...",
-        "base_url": "https://api.openai.com/v1"
-    },
-    "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-})
-
-# With OpenAI for both LLM and embeddings
-kb = Ragi("./docs", config={
-    "llm": {
-        "model": "gpt-4o-mini",
-        "api_key": "sk-...",
-        "base_url": "https://api.openai.com/v1"
-    },
-    "embedding": {
-        "model": "text-embedding-3-small",
-        "base_url": "https://api.openai.com/v1",
-        "api_key": "sk-..."
-    }
-})
-
-# Custom chunking
-kb = Ragi("./docs", config={
-    "chunk": {"size": 1024, "overlap": 100},
-    "embedding": {"model": "sentence-transformers/all-MiniLM-L6-v2"}
-})
-
-# Empty initialization (add documents later)
-kb = Ragi(persist_dir=".my_kb")
-kb.add("./docs")
+# Custom store
+kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
 ```
 
-#### Methods
+### Methods
 
-##### `add(sources: Union[str, List[str]]) -> Ragi`
-
+#### `add(sources) -> Ragi`
 Add documents to the knowledge base.
 
-**Parameters:**
-- `sources` - File paths, URLs, or glob patterns
-
-**Returns:** Self for chaining
-
-**Examples:**
 ```python
-# Single file
-kb.add("./README.md")
-
-# Multiple files
-kb.add(["./docs/*.pdf", "./src/**/*.py"])
-
-# Chaining
-kb.add("./docs").add("./src")
-
-# URLs
-kb.add("https://example.com/guide")
+kb.add("./more-docs")
+kb.add(["./docs/*.pdf", "s3://bucket/files/*.md"])
 ```
 
-##### `ask(query: str, top_k: int = 5, system_prompt: Optional[str] = None) -> Answer`
-
+#### `ask(query, top_k=5, system_prompt=None) -> Answer`
 Ask a question and get an answer with citations.
 
-**Parameters:**
-- `query` - Question to ask
-- `top_k` - Number of relevant chunks to retrieve (default: 5)
-- `system_prompt` - Custom system prompt for answer generation
-
-**Returns:** `Answer` object with text and citations
-
-**Examples:**
 ```python
 answer = kb.ask("How do I install this?")
 print(answer.text)
-
-# More context
-answer = kb.ask("How does auth work?", top_k=10)
-
-# Custom prompt
-prompt = "Answer concisely with code examples when relevant."
-answer = kb.ask("Show me usage examples", system_prompt=prompt)
+print(answer.citations)
 ```
 
-##### `__call__(query: str, top_k: int = 5) -> Answer`
+#### `retrieve(query, top_k=5) -> List[Citation]`
+Retrieve relevant chunks without LLM generation.
 
-Callable shorthand for `ask()`.
-
-**Parameters:**
-- `query` - Question to ask
-- `top_k` - Number of relevant chunks to retrieve
-
-**Returns:** `Answer` object
-
-**Examples:**
 ```python
-# These are equivalent:
-answer = kb.ask("What is this?")
-answer = kb("What is this?")
+chunks = kb.retrieve("authentication")
+for c in chunks:
+    print(c.chunk, c.source, c.score)
 ```
 
-##### `filter(**kwargs) -> Ragi`
+#### `filter(**kwargs) -> Ragi`
+Filter by metadata for the next query.
 
-Filter documents by metadata for the next query.
-
-**Parameters:**
-- `**kwargs` - Metadata key-value pairs to filter by
-
-**Returns:** Self for chaining
-
-**Examples:**
 ```python
-# Filter by file type
 answer = kb.filter(file_type="pdf").ask("What's in the PDFs?")
-
-# Filter by custom metadata
-answer = kb.filter(category="api", version="v2").ask("How does it work?")
-
-# Multiple filters
-answer = kb.filter(author="Alice", topic="security").ask("Security guidelines?")
 ```
 
-##### `count() -> int`
+#### `refresh(sources) -> Ragi`
+Force refresh specific sources.
 
-Return the number of chunks in the knowledge base.
-
-**Returns:** Number of chunks
-
-**Examples:**
 ```python
-print(f"Knowledge base contains {kb.count()} chunks")
-```
-
-##### `refresh(sources: Union[str, List[str]]) -> Ragi`
-
-Refresh specific sources by deleting old chunks and re-adding. Useful when documents have been updated.
-
-**Parameters:**
-- `sources` - File paths, URLs, or glob patterns to refresh
-
-**Returns:** Self for chaining
-
-**Examples:**
-```python
-# Refresh a single file
 kb.refresh("./docs/api.md")
-
-# Refresh multiple files
-kb.refresh(["./docs/*.pdf", "./README.md"])
-
-# Refresh after editing
-with open("./docs/guide.md", "w") as f:
-    f.write("Updated content...")
-kb.refresh("./docs/guide.md")
 ```
 
-##### `clear() -> None`
+#### `count() -> int`
+Number of chunks in the knowledge base.
 
-Clear all data from the knowledge base.
-
-**Examples:**
-```python
-kb.clear()
-print(kb.count())  # 0
-```
+#### `clear() -> None`
+Clear all data.
 
 ## Data Types
 
-### `Answer`
-
-Result from a query with answer text and citations.
-
-**Attributes:**
-- `text: str` - The generated answer
-- `citations: List[Citation]` - Source citations
-- `query: str` - Original query
-
-**Methods:**
-- `__str__()` - Returns answer text
-- `__repr__()` - Returns detailed representation
-
-**Examples:**
+### Answer
 ```python
-answer = kb.ask("What is RAG?")
-
-print(answer.text)              # The answer
-print(answer.query)             # "What is RAG?"
-print(len(answer.citations))    # Number of citations
-
-# String representation
-print(answer)                   # Same as answer.text
-print(repr(answer))             # Answer(text='...', citations=3)
+answer.text        # Generated answer
+answer.citations   # List[Citation]
+answer.query       # Original query
 ```
 
-### `Citation`
-
-A single source citation with relevance score.
-
-**Attributes:**
-- `source: str` - Source file path or URL
-- `chunk: str` - The actual text chunk
-- `score: float` - Relevance score (0-1, higher is better)
-- `metadata: Dict[str, Any]` - Additional metadata
-
-**Properties:**
-- `preview: str` - Preview of chunk (first 100 chars)
-
-**Examples:**
+### Citation
 ```python
-for citation in answer.citations:
-    print(f"Source: {citation.source}")
-    print(f"Score: {citation.score:.2%}")
-    print(f"Preview: {citation.preview}")
-    print(f"Metadata: {citation.metadata}")
+citation.source    # File path or URL
+citation.chunk     # Text content
+citation.score     # Relevance score (0-1)
+citation.metadata  # Dict of metadata
 ```
+
+## Configuration
+
+```python
+config = {
+    "llm": {
+        "model": "llama3.2",
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "not-needed",
+        "temperature": 0.1,
+    },
+    "embedding": {
+        "model": "all-mpnet-base-v2",
+        "device": None,  # auto-detect
+        "base_url": None,  # for remote embeddings
+        "api_key": None,
+    },
+    "chunk": {
+        "strategy": "fixed",  # fixed, semantic, contextual, hierarchical
+        "size": 512,
+        "overlap": 50,
+    },
+    "retrieval": {
+        "use_hyde": False,
+        "use_hybrid_search": False,
+        "use_cross_encoder": False,
+    },
+    "auto_update": {
+        "enabled": True,
+        "interval": 300,
+    },
+}
+```
+
+## Vector Stores
+
+### LanceDB (default)
+```python
+kb = Ragi("./docs")  # Local
+kb = Ragi("./docs", store="s3://bucket/indices")  # S3-backed
+```
+
+### PostgreSQL
+```python
+kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
+```
+Requires: `pip install piragi[postgres]`
+
+### Pinecone
+```python
+from piragi.stores import PineconeStore
+
+kb = Ragi("./docs", store=PineconeStore(
+    api_key="...",
+    index_name="my-index",
+))
+```
+Requires: `pip install piragi[pinecone]`
+
+### Supabase
+```python
+from piragi.stores import SupabaseStore
+
+kb = Ragi("./docs", store=SupabaseStore(
+    url="https://xxx.supabase.co",
+    key="your-service-role-key",
+))
+```
+Requires: `pip install piragi[supabase]`
+
+### Custom Store
+Implement `VectorStoreProtocol`:
+
+```python
+from piragi.stores import VectorStoreProtocol
+
+class MyStore:
+    def add_chunks(self, chunks: List[Chunk]) -> None: ...
+    def search(self, query_embedding, top_k=5, filters=None) -> List[Citation]: ...
+    def delete_by_source(self, source: str) -> int: ...
+    def count(self) -> int: ...
+    def clear(self) -> None: ...
+    def get_all_chunk_texts(self) -> List[str]: ...
+
+kb = Ragi("./docs", store=MyStore())
+```
+
+## Remote Filesystems
+
+Supported schemes: `s3://`, `gs://`, `gcs://`, `az://`, `abfs://`, `hdfs://`, `sftp://`, `ftp://`
+
+```python
+# S3
+kb = Ragi("s3://bucket/docs/**/*.pdf")
+
+# Google Cloud Storage
+kb = Ragi("gs://bucket/reports/*.md")
+
+# Azure Blob
+kb = Ragi("az://container/files/*.txt")
+
+# Mix sources
+kb = Ragi([
+    "./local",
+    "s3://bucket/remote/**/*.pdf",
+    "https://example.com/docs"
+])
+```
+
+Requires optional extras:
+- `pip install piragi[s3]` for S3
+- `pip install piragi[gcs]` for GCS
+- `pip install piragi[azure]` for Azure
+- `pip install piragi[remote]` for all
+
+## Web Crawling
+
+Recursively crawl websites using `/**` suffix:
+
+```python
+# Crawl entire site (same domain, max depth 3, max 100 pages)
+kb = Ragi("https://docs.example.com/**")
+
+# Crawl specific section
+kb = Ragi("https://docs.example.com/api/**")
+```
+
+Features:
+- Follows same-domain internal links only
+- Respects max depth (default: 3) and max pages (default: 100)
+- Uses crawl4ai with headless browser for JS rendering
+- Returns markdown content for each page
+
+Requires: `pip install piragi[crawler]`
 
 ## Supported File Formats
 
-Ragi uses [markitdown](https://github.com/microsoft/markitdown) for document conversion and supports:
-
-### Documents
-- PDF (`.pdf`)
-- Microsoft Word (`.docx`, `.doc`)
-- Microsoft PowerPoint (`.pptx`, `.ppt`)
-- Microsoft Excel (`.xlsx`, `.xls`)
-
-### Text
-- Markdown (`.md`)
-- Plain text (`.txt`)
-- Source code (`.py`, `.js`, `.java`, `.cpp`, etc.)
-- HTML (`.html`)
-
-### Data
-- JSON (`.json`)
-- XML (`.xml`)
-- CSV (`.csv`)
-
-### Media
-- Images (`.png`, `.jpg`, `.jpeg`, `.gif`) - with OCR
-- Audio (`.mp3`, `.wav`) - with transcription
-
-### Web
-- URLs (converted to markdown)
-
-### Archives
-- ZIP files (`.zip`)
-
-### E-books
-- EPub (`.epub`)
-
-## Metadata Fields
-
-### Automatic Metadata
-
-Automatically extracted for all documents:
-- `filename` - File name
-- `file_type` - File extension without dot
-- `file_path` - Absolute file path
-
-For URLs:
-- `url` - The URL
-- `source_type` - Always "url"
-
-### Custom Metadata
-
-Add custom metadata when loading:
-```python
-# This is a planned feature
-kb.add("./docs/api.pdf", metadata={"category": "api", "version": "v2"})
-```
-
-Filter by custom metadata:
-```python
-answer = kb.filter(category="api").ask("How does it work?")
-```
-
-## Error Handling
-
-### Common Exceptions
-
-```python
-# Invalid source
-try:
-    kb = Ragi("/nonexistent/path")
-except ValueError as e:
-    print(f"Error: {e}")
-
-# Missing API key
-try:
-    kb = Ragi("./docs")
-except RuntimeError as e:
-    print(f"Error: {e}")
-
-# Embedding generation failed
-try:
-    answer = kb.ask("question")
-except RuntimeError as e:
-    print(f"Error: {e}")
-```
+- **Documents:** PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx)
+- **Text:** Markdown, Plain text, Source code, HTML
+- **Data:** JSON, XML, CSV
+- **Media:** Images (OCR), Audio (transcription)
+- **Web:** URLs
+- **Archives:** ZIP
+- **E-books:** EPUB
 
 ## Environment Variables
 
-- `LLM_BASE_URL` - LLM API base URL (default: `http://localhost:11434/v1`)
-- `LLM_API_KEY` - LLM API key (default: `not-needed`)
-
-For Ollama (default, free local models):
 ```bash
-# No environment variables needed!
-# Just make sure Ollama is running: ollama serve
-```
-
-For OpenAI or other providers:
-```bash
-export LLM_BASE_URL="https://api.openai.com/v1"
-export LLM_API_KEY="sk-..."
-```
-
-Or in `.env` file:
-```
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=sk-...
-```
-
-## Best Practices
-
-### Chunking
-- Use smaller chunks (256-512) for precise retrieval
-- Use larger chunks (1024+) when more context is needed
-- Increase overlap (100-200) for better continuity
-
-### Embeddings
-- Use `sentence-transformers/all-MiniLM-L6-v2` for free, fast embeddings (recommended for getting started)
-- Use `nvidia/llama-embed-nemotron-8b` for higher quality (requires HuggingFace auth)
-- Use any sentence-transformers model from HuggingFace
-
-### LLM Selection
-- Use `llama3.2` via Ollama for free local inference (default)
-- Use `mistral` via Ollama for fast responses
-- Use OpenAI-compatible APIs for cloud-based models (configure via `config` dict)
-
-### Performance
-- Persist data to disk to avoid re-processing:
-  ```python
-  kb = Ragi("./docs", persist_dir=".kb")
-  ```
-- Batch document additions:
-  ```python
-  kb.add(["doc1.pdf", "doc2.pdf", "doc3.pdf"])
-  ```
-- Use appropriate `top_k` values (5-10 for most cases)
-
-### Filtering
-- Use metadata filters to narrow search space
-- Combine filters for precise targeting:
-  ```python
-  kb.filter(type="api", version="v2").ask("...")
-  ```
-
-## Type Hints
-
-Ragi is fully typed. Example:
-
-```python
-from typing import List
-from ragi import Ragi, Answer, Citation
-
-kb: Ragi = Ragi("./docs")
-answer: Answer = kb.ask("What is this?")
-citations: List[Citation] = answer.citations
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_API_KEY=not-needed
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_KEY=your-key
 ```

@@ -25,6 +25,10 @@ from .protocol import VectorStoreProtocol
 from .lance import LanceStore
 from .postgres import PostgresStore
 from .pinecone import PineconeStore
+try:
+    from .supabase import SupabaseStore
+except ImportError:
+    SupabaseStore = None  # Optional dependency
 from .factory import create_store, parse_store_uri
 
 __all__ = [
@@ -32,6 +36,7 @@ __all__ = [
     "LanceStore",
     "PostgresStore",
     "PineconeStore",
+    "SupabaseStore",
     "create_store",
     "parse_store_uri",
 ]

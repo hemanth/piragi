@@ -1,0 +1,8 @@
+# Requirements for Hugging Face Spaces demo
+streamlit>=1.28.0
+sentence-transformers>=2.2.0
+lancedb>=0.1.0
+openai>=1.0.0
+markitdown>=0.1.0
+tiktoken>=0.5.0
+httpx>=0.25.0

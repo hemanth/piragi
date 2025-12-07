@@ -149,7 +149,7 @@ class LanceStore:
                 Citation(
                     source=result["source"],
                     chunk=chunk_text,
-                    score=1.0 - result["_distance"],
+                    score=max(0.0, min(1.0, 1.0 - result["_distance"])),
                     metadata=result["metadata"],
                 )
             )

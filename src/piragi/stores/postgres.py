@@ -58,7 +58,7 @@ class PostgresStore:
         except ImportError:
             raise ImportError(
                 "PostgresStore requires psycopg2 and pgvector. "
-                "Install with: pip install psycopg2-binary pgvector"
+                "Install with: pip install piragi[postgres]"
             )
 
         self.table_name = table_name

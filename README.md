@@ -5,13 +5,11 @@
 ```python
 from piragi import Ragi
 
-kb = Ragi(["./docs", "./code/**/*.py", "https://api.example.com/docs"])
+kb = Ragi(["./docs", "s3://bucket/data/**/*.pdf", "https://api.example.com/docs"])
 answer = kb.ask("How do I deploy this?")
 ```
 
-That's it. Built-in vector store, embeddings, citations, and auto-updates. Free & local by default.
-
----
+Built-in vector store, embeddings, citations, and auto-updates. Free & local by default.
 
 ## Installation
 
@@ -21,111 +19,181 @@ pip install piragi
 # Optional: Install Ollama for local LLM
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
-```
 
----
+# Optional extras
+pip install piragi[s3]       # S3 support
+pip install piragi[gcs]      # Google Cloud Storage
+pip install piragi[azure]    # Azure Blob Storage
+pip install piragi[crawler]  # Recursive web crawling
+pip install piragi[graph]    # Knowledge graph
+pip install piragi[postgres] # PostgreSQL/pgvector
+pip install piragi[pinecone] # Pinecone
+pip install piragi[supabase] # Supabase
+pip install piragi[all]      # Everything
+```
 
 ## Features
 
-- **Simple Setup** - Works with free local models out of the box
+- **Zero Config** - Works with free local models out of the box
 - **All Formats** - PDF, Word, Excel, Markdown, Code, URLs, Images, Audio
+- **Remote Storage** - Read from S3, GCS, Azure, HDFS, SFTP with glob patterns
+- **Web Crawling** - Recursively crawl websites with `/**` syntax
 - **Auto-Updates** - Background refresh, queries never blocked
 - **Smart Citations** - Every answer includes sources
-- **OpenAI Compatible** - Drop-in support for any OpenAI-compatible API
+- **Pluggable Stores** - LanceDB, PostgreSQL, Pinecone, Supabase, or custom
 - **Advanced Retrieval** - HyDE, hybrid search, cross-encoder reranking
-- **Semantic Chunking** - Context-aware, proposition-based, and hierarchical chunking
-- **Pluggable Storage** - Local, S3, PostgreSQL, Pinecone, or custom backends
+- **Semantic Chunking** - Context-aware and hierarchical chunking
+- **Knowledge Graph** - Entity/relationship extraction for better answers
 
----
-
-## Examples
+## Quick Start
 
 ```python
-# Basic
-kb = Ragi("./docs")
-answer = kb("What is this?")
+from piragi import Ragi
 
-# Multiple sources
+# Local files
+kb = Ragi("./docs")
+
+# Multiple sources with globs
 kb = Ragi(["./docs/*.pdf", "https://api.docs.com", "./code/**/*.py"])
 
-# OpenAI
-kb = Ragi("./docs", config={
-    "llm": {"model": "gpt-4o-mini", "api_key": "sk-..."},
-    "embedding": {"model": "text-embedding-3-small", "api_key": "sk-..."}
-})
+# Remote filesystems
+kb = Ragi("s3://bucket/docs/**/*.pdf")
+kb = Ragi("gs://bucket/reports/*.md")
 
-# Filter
-answer = kb.filter(file_type="pdf").ask("What's in the PDFs?")
+# Ask questions
+answer = kb.ask("What is the API rate limit?")
+print(answer.text)
+
+# View citations
+for cite in answer.citations:
+    print(f"{cite.source}: {cite.score:.0%}")
 ```
 
----
+## Remote Filesystems
+
+Read files from cloud storage using glob patterns:
+
+```python
+# S3
+kb = Ragi("s3://my-bucket/docs/**/*.pdf")
+
+# Google Cloud Storage
+kb = Ragi("gs://my-bucket/reports/*.md")
+
+# Azure Blob Storage
+kb = Ragi("az://my-container/files/*.txt")
+
+# Mix local and remote
+kb = Ragi([
+    "./local-docs",
+    "s3://bucket/remote-docs/**/*.pdf",
+    "https://example.com/api-docs"
+])
+```
+
+Requires optional extras: `pip install piragi[s3]`, `piragi[gcs]`, or `piragi[azure]`
+
+## Web Crawling
+
+Recursively crawl websites using `/**` suffix:
+
+```python
+# Crawl entire site
+kb = Ragi("https://docs.example.com/**")
+
+# Crawl specific section
+kb = Ragi("https://docs.example.com/api/**")
+
+# Mix with other sources
+kb = Ragi([
+    "./local-docs",
+    "https://docs.example.com/**",
+    "s3://bucket/data/*.pdf"
+])
+```
+
+Crawls same-domain links up to depth 3, max 100 pages by default.
+
+Requires: `pip install piragi[crawler]`
+
+## Vector Store Backends
+
+```python
+from piragi import Ragi
+from piragi.stores import PineconeStore, SupabaseStore
+
+# LanceDB (default) - local or S3-backed
+kb = Ragi("./docs")
+kb = Ragi("./docs", store="s3://bucket/indices")
+
+# PostgreSQL with pgvector
+kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
+
+# Pinecone
+kb = Ragi("./docs", store=PineconeStore(api_key="...", index_name="my-index"))
+
+# Supabase
+kb = Ragi("./docs", store=SupabaseStore(url="https://xxx.supabase.co", key="..."))
+```
 
 ## Advanced Retrieval
-
-Enable state-of-the-art retrieval techniques for better answer quality:
 
 ```python
 kb = Ragi("./docs", config={
     "retrieval": {
-        "use_hyde": True,           # HyDE: generate hypothetical docs for better matching
-        "use_hybrid_search": True,  # Combine BM25 + vector search
-        "use_cross_encoder": True,  # Cross-encoder reranking for precision
+        "use_hyde": True,           # Hypothetical document embeddings
+        "use_hybrid_search": True,  # BM25 + vector search
+        "use_cross_encoder": True,  # Neural reranking
     }
 })
 ```
 
-**Available techniques:**
-- **HyDE** - Hypothetical Document Embeddings for improved semantic matching
-- **Hybrid Search** - BM25 keyword matching + vector similarity with RRF fusion
-- **Cross-Encoder Reranking** - Neural reranking for high precision results
-
----
-
 ## Chunking Strategies
 
-Choose the chunking strategy that fits your documents:
-
 ```python
-# Semantic chunking - splits at natural topic boundaries
-kb = Ragi("./docs", config={
-    "chunk": {"strategy": "semantic", "similarity_threshold": 0.5}
-})
+# Semantic - splits at topic boundaries
+kb = Ragi("./docs", config={"chunk": {"strategy": "semantic"}})
 
-# Contextual chunking - LLM-generated context for each chunk
-kb = Ragi("./docs", config={
-    "chunk": {"strategy": "contextual"}
-})
+# Hierarchical - parent-child for context + precision
+kb = Ragi("./docs", config={"chunk": {"strategy": "hierarchical"}})
 
-# Hierarchical chunking - parent-child relationships for context + precision
-kb = Ragi("./docs", config={
-    "chunk": {"strategy": "hierarchical", "parent_size": 2000, "child_size": 400}
-})
+# Contextual - LLM-generated context per chunk
+kb = Ragi("./docs", config={"chunk": {"strategy": "contextual"}})
 ```
 
-**Available strategies:**
-- **fixed** (default) - Simple token-based chunking with overlap
-- **semantic** - Embedding-based splitting at topic boundaries
-- **contextual** - Each chunk includes LLM-generated document context
-- **hierarchical** - Large parent chunks for context, small children for retrieval
+## Knowledge Graph
 
----
+Extract entities and relationships for better multi-hop reasoning:
+
+```python
+# Enable with single flag
+kb = Ragi("./docs", graph=True)
+
+# Automatic - extracts entities/relationships during ingestion
+# Uses them to augment retrieval for relationship questions
+answer = kb.ask("Who reports to Alice?")
+
+# Direct graph access
+kb.graph.entities()           # ["alice", "bob", "project x"]
+kb.graph.neighbors("alice")   # ["bob", "engineering team"]
+kb.graph.triples()            # [("alice", "manages", "bob"), ...]
+```
+
+Requires: `pip install piragi[graph]`
 
 ## Configuration
 
 ```python
-# Defaults (all optional)
 config = {
     "llm": {
         "model": "llama3.2",
         "base_url": "http://localhost:11434/v1"
     },
     "embedding": {
-        "model": "all-mpnet-base-v2"  # ~420MB, good quality
-        # For max quality: "nvidia/llama-embed-nemotron-8b" (~8GB)
-        # For minimal: "all-MiniLM-L6-v2" (~90MB)
+        "model": "all-mpnet-base-v2"
     },
     "chunk": {
-        "strategy": "fixed",  # or "semantic", "contextual", "hierarchical"
+        "strategy": "fixed",
         "size": 512,
         "overlap": 50
     },
@@ -136,134 +204,40 @@ config = {
     },
     "auto_update": {
         "enabled": True,
-        "interval": 300  # seconds
+        "interval": 300
     }
 }
 ```
 
----
+## Retrieval Only
 
-## Auto-Updates
-
-Changes detected and refreshed automatically in background. Zero query latency.
+Use piragi as a retrieval layer without LLM:
 
 ```python
-kb = Ragi(["./docs", "https://api.docs.com"])
-# That's it - auto-updates enabled by default
-
-# Disable if needed
-kb = Ragi("./docs", config={"auto_update": {"enabled": False}})
-```
-
----
-
-## Custom Storage Backends
-
-Use your own infrastructure for production:
-
-```python
-from piragi import Ragi
-from piragi.stores import PineconeStore, PostgresStore, LanceStore
-
-# S3-backed storage (via LanceDB)
-kb = Ragi("./docs", store="s3://my-bucket/indices")
-
-# PostgreSQL with pgvector
-kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
-
-# Pinecone
-kb = Ragi("./docs", store=PineconeStore(
-    api_key="your-api-key",
-    index_name="my-index"
-))
-
-# Or use URI format
-kb = Ragi("./docs", store="pinecone://my-index?api_key=...")
-```
-
-**Supported backends:**
-- **LanceDB** (default) - Local or S3-backed, zero config
-- **PostgreSQL** - pgvector extension for production databases
-- **Pinecone** - Managed vector database
-
-**Custom stores:**
-
-```python
-from piragi.stores import VectorStoreProtocol
-
-class MyStore:
-    def add_chunks(self, chunks): ...
-    def search(self, query_embedding, top_k=5, filters=None): ...
-    def delete_by_source(self, source): ...
-    def count(self): ...
-    def clear(self): ...
-    def get_all_chunk_texts(self): ...
-
-kb = Ragi("./docs", store=MyStore())
-```
-
----
-
-## Retrieval Only (No LLM)
-
-Use piragi as a pure retrieval layer - bring your own LLM:
-
-```python
-from piragi import Ragi
-
-kb = Ragi("./docs")
-
-# Just get relevant chunks - no LLM involved
-chunks = kb.retrieve("How does authentication work?", top_k=5)
-
+chunks = kb.retrieve("How does auth work?", top_k=5)
 for chunk in chunks:
-    print(chunk.chunk)   # text content
-    print(chunk.source)  # source file/url
-    print(chunk.score)   # relevance score
+    print(chunk.chunk, chunk.source, chunk.score)
 
-# Use with your own LLM / framework
+# Use with your own LLM
 context = "\n".join(c.chunk for c in chunks)
-response = your_llm(f"Based on:\n{context}\n\nAnswer: {query}")
+response = your_llm(f"Context:\n{context}\n\nQuestion: {query}")
 ```
-
-Works with LangChain, LlamaIndex, direct API calls, or any framework.
-
----
 
 ## API
 
 ```python
 kb = Ragi(sources, persist_dir=".piragi", config=None, store=None)
 kb.add("./more-docs")
-kb.ask(query, top_k=5)              # Full RAG (retrieval + LLM)
-kb.retrieve(query, top_k=5)         # Retrieval only (no LLM)
-kb(query)                           # Shorthand for ask()
+kb.ask(query, top_k=5)
+kb.retrieve(query, top_k=5)
 kb.filter(**metadata).ask(query)
-kb.filter(**metadata).retrieve(query)
-kb.refresh("./docs")                # Force refresh sources
+kb.refresh("./docs")
 kb.count()
 kb.clear()
 ```
 
-**Advanced components (for custom pipelines):**
-
-```python
-from piragi import (
-    # Vector stores
-    VectorStoreProtocol, LanceStore, PostgresStore, PineconeStore,
-    # Reranking
-    CrossEncoderReranker, TFIDFReranker, HybridReranker,
-    # Hybrid search
-    BM25, HybridSearcher,
-    # Query transformation
-    HyDE, QueryExpander, MultiQueryRetriever, StepBackPrompting,
-    # Chunking strategies
-    SemanticChunker, ContextualChunker, PropositionChunker, HierarchicalChunker,
-)
-```
-
 Full docs: [API.md](API.md)
 
----
+## License
 
-MIT License | **piragi** = **P**owerful **I**nterface for **R**etrieval **A**ugmented **G**eneration **I**ntelligence
+MIT

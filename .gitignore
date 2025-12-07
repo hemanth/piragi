@@ -52,3 +52,4 @@ lancedb/
 .DS_Store
 Thumbs.db
 test_env/
+CLAUDE.md
