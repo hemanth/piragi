@@ -71,7 +71,11 @@ class EmbeddingGenerator:
 
         # Add embeddings to chunks
         for chunk, embedding in zip(chunks, embeddings):
-            chunk.embedding = embedding.tolist()
+            # Handle both numpy arrays (local) and lists (remote/Ollama)
+            if hasattr(embedding, 'tolist'):
+                chunk.embedding = embedding.tolist()
+            else:
+                chunk.embedding = embedding
 
         return chunks
 
@@ -144,7 +148,10 @@ class EmbeddingGenerator:
                         query_text = f"{task_instruction}\n{query}"
                     embedding = self.model.encode(query_text)
 
-                return embedding.tolist()
+                # Handle both numpy arrays and lists
+                if hasattr(embedding, 'tolist'):
+                    return embedding.tolist()
+                return embedding
 
         except Exception as e:
             raise RuntimeError(f"Failed to generate query embedding: {e}")

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2025-12-06
+
+### Fixed
+- Ollama embedding models crash with `AttributeError: 'list' object has no attribute 'tolist'`
+- Handle both numpy arrays (local models) and lists (remote/Ollama) in embedding generation
+
 ## [0.7.1] - 2025-12-06
 
 ### Added
@@ -93,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata filtering
 - Auto-updates with background workers
 
+[0.7.2]: https://github.com/hemanth/piragi/releases/tag/v0.7.2
 [0.7.1]: https://github.com/hemanth/piragi/releases/tag/v0.7.1
 [0.7.0]: https://github.com/hemanth/piragi/releases/tag/v0.7.0
 [0.6.1]: https://github.com/hemanth/piragi/releases/tag/v0.6.1
