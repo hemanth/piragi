@@ -56,9 +56,9 @@ class TestProcessingHooks:
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
                 "auto_update": {"enabled": False},
-                "hooks": {
-                    "post_load": add_metadata,
-                },
+            },
+            hooks={
+                "post_load": add_metadata,
             },
         )
         
@@ -81,9 +81,9 @@ class TestProcessingHooks:
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
                 "auto_update": {"enabled": False},
-                "hooks": {
-                    "post_chunk": enrich_chunks,
-                },
+            },
+            hooks={
+                "post_chunk": enrich_chunks,
             },
         )
         
@@ -112,9 +112,9 @@ class TestProcessingHooks:
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
                 "auto_update": {"enabled": False},
-                "hooks": {
-                    "post_embed": extract_entities,
-                },
+            },
+            hooks={
+                "post_embed": extract_entities,
             },
         )
         
@@ -145,11 +145,11 @@ class TestProcessingHooks:
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
                 "auto_update": {"enabled": False},
-                "hooks": {
-                    "post_load": post_load_hook,
-                    "post_chunk": post_chunk_hook,
-                    "post_embed": post_embed_hook,
-                },
+            },
+            hooks={
+                "post_load": post_load_hook,
+                "post_chunk": post_chunk_hook,
+                "post_embed": post_embed_hook,
             },
         )
         
@@ -167,9 +167,9 @@ class TestProcessingHooks:
             config={
                 "embedding": {"model": "all-MiniLM-L6-v2"},
                 "auto_update": {"enabled": False},
-                "hooks": {
-                    "post_chunk": filter_short_chunks,
-                },
+            },
+            hooks={
+                "post_chunk": filter_short_chunks,
             },
         )
         
@@ -188,7 +188,6 @@ class TestProcessingHooks:
         )
         
         assert kb.count() > 0
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

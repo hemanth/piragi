@@ -45,6 +45,7 @@ class Ragi:
         persist_dir: str = ".piragi",
         config: Optional[Dict[str, Any]] = None,
         store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
+        hooks: Optional[Dict[str, Any]] = None,
         graph: bool = False,
     ) -> None:
         """
@@ -79,18 +80,18 @@ class Ragi:
                     - enabled: Enable background updates (default: True)
                     - interval: Check interval in seconds (default: 300)
                     - workers: Number of background workers (default: 2)
-                - hooks: Processing hooks for custom transformations
-                    - post_load: Called after loading documents, before chunking
-                        Signature: (docs: List[Document]) -> List[Document]
-                    - post_chunk: Called after chunking, before embedding
-                        Signature: (chunks: List[Chunk]) -> List[Chunk]
-                    - post_embed: Called after embedding, before storage
-                        Signature: (chunks: List[Chunk]) -> List[Chunk]
             store: Vector store backend. Can be:
                 - None: Use default LanceDB with persist_dir
                 - str: URI (e.g., "s3://bucket/path", "postgres://...", "pinecone://...")
                 - dict: Store config {"type": "pinecone", "api_key": "...", ...}
                 - VectorStoreProtocol: Custom store implementation
+            hooks: Processing hooks for custom transformations at each stage:
+                - post_load: Called after loading documents, before chunking
+                    Signature: (docs: List[Document]) -> List[Document]
+                - post_chunk: Called after chunking, before embedding
+                    Signature: (chunks: List[Chunk]) -> List[Chunk]
+                - post_embed: Called after embedding, before storage
+                    Signature: (chunks: List[Chunk]) -> List[Chunk]
             graph: Enable knowledge graph for entity/relationship extraction (default: False)
                 Requires: pip install piragi[graph]
 
@@ -238,7 +239,7 @@ class Ragi:
         self._filters: Optional[Dict[str, Any]] = None
 
         # Processing hooks
-        hooks_cfg = cfg.get("hooks", {})
+        hooks_cfg = hooks or {}
         self._post_load_hook: Optional[DocumentHook] = hooks_cfg.get("post_load")
         self._post_chunk_hook: Optional[ChunkHook] = hooks_cfg.get("post_chunk")
         self._post_embed_hook: Optional[ChunkHook] = hooks_cfg.get("post_embed")
