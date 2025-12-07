@@ -1,11 +1,12 @@
 """Document loading using markitdown."""
 
+import asyncio
 import glob
 import os
 import tempfile
 from pathlib import Path
-from typing import List, Union
-from urllib.parse import urlparse
+from typing import List, Optional, Union
+from urllib.parse import urlparse, urljoin
 
 from markitdown import MarkItDown
 
@@ -16,6 +17,9 @@ REMOTE_SCHEMES = {"s3", "gs", "gcs", "az", "abfs", "abfss", "hdfs", "webhdfs", "
 
 # Lazy import fsspec - only when needed
 _fsspec = None
+
+# Lazy import crawl4ai - only when needed
+_crawl4ai = None
 
 
 def _get_fsspec():
@@ -31,6 +35,21 @@ def _get_fsspec():
                 "Install it with: pip install piragi[remote] or pip install fsspec"
             )
     return _fsspec
+
+
+def _get_crawl4ai():
+    """Lazy load crawl4ai, raising helpful error if not installed."""
+    global _crawl4ai
+    if _crawl4ai is None:
+        try:
+            import crawl4ai
+            _crawl4ai = crawl4ai
+        except ImportError:
+            raise ImportError(
+                "crawl4ai is required for recursive URL crawling. "
+                "Install it with: pip install piragi[crawler] or pip install crawl4ai"
+            )
+    return _crawl4ai
 
 
 class DocumentLoader:
@@ -67,6 +86,10 @@ class DocumentLoader:
         if self._is_remote_uri(source):
             return self._load_remote(source)
 
+        # Check if it's a crawl URL (ends with /**)
+        if self._is_crawl_url(source):
+            return self._crawl_url(source)
+
         # Check if it's a URL (http/https)
         if self._is_url(source):
             return [self._load_url(source)]
@@ -100,6 +123,14 @@ class DocumentLoader:
             return result.scheme in ("http", "https") and bool(result.netloc)
         except Exception:
             return False
+
+    def _is_crawl_url(self, source: str) -> bool:
+        """Check if source is a crawl URL (http(s) URL ending with /**)."""
+        if not source.endswith("/**"):
+            return False
+        # Remove /** and check if it's a valid URL
+        base_url = source[:-3]
+        return self._is_url(base_url)
 
     def _load_file(self, file_path: str) -> Document:
         """Load a single file."""
@@ -267,3 +298,120 @@ class DocumentLoader:
         finally:
             # Clean up temp file
             os.unlink(tmp_path)
+
+    def _crawl_url(
+        self,
+        source: str,
+        max_depth: int = 3,
+        max_pages: int = 100,
+    ) -> List[Document]:
+        """
+        Recursively crawl a website and load all pages.
+
+        Uses crawl4ai for efficient async crawling with JS rendering support.
+
+        Args:
+            source: URL ending with /** (e.g., https://docs.example.com/**)
+            max_depth: Maximum depth to crawl (default: 3)
+            max_pages: Maximum number of pages to crawl (default: 100)
+
+        Returns:
+            List of Document objects for each crawled page
+        """
+        # Get crawl4ai (lazy import)
+        crawl4ai = _get_crawl4ai()
+        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+
+        # Remove /** suffix to get base URL
+        base_url = source[:-3]
+        parsed_base = urlparse(base_url)
+        base_domain = parsed_base.netloc
+
+        # Track visited URLs and documents
+        visited: set = set()
+        documents: List[Document] = []
+        to_visit: List[tuple] = [(base_url, 0)]  # (url, depth)
+
+        async def crawl_page(crawler: AsyncWebCrawler, url: str) -> Optional[tuple]:
+            """Crawl a single page and return (content, links)."""
+            try:
+                config = CrawlerRunConfig()
+                result = await crawler.arun(url=url, config=config)
+                if result.success:
+                    return result.markdown, result.links.get("internal", [])
+                return None
+            except Exception:
+                return None
+
+        async def run_crawler():
+            """Run the async crawler."""
+            nonlocal documents, visited, to_visit
+
+            browser_config = BrowserConfig(headless=True)
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                while to_visit and len(documents) < max_pages:
+                    url, depth = to_visit.pop(0)
+
+                    # Skip if already visited or exceeds max depth
+                    if url in visited or depth > max_depth:
+                        continue
+
+                    visited.add(url)
+
+                    # Crawl the page
+                    result = await crawl_page(crawler, url)
+                    if result is None:
+                        continue
+
+                    content, links = result
+
+                    # Skip empty content
+                    if not content or len(content.strip()) < 50:
+                        continue
+
+                    # Create document
+                    metadata = {
+                        "filename": url.split("/")[-1] or "index",
+                        "file_type": "url",
+                        "file_path": url,
+                        "crawl_depth": depth,
+                        "crawl_source": base_url,
+                    }
+                    documents.append(Document(
+                        content=content,
+                        source=url,
+                        metadata=metadata,
+                    ))
+
+                    # Add internal links to queue (same domain only)
+                    if depth < max_depth:
+                        for link in links:
+                            link_url = link.get("href", "") if isinstance(link, dict) else str(link)
+                            if not link_url:
+                                continue
+
+                            # Resolve relative URLs
+                            full_url = urljoin(url, link_url)
+                            parsed = urlparse(full_url)
+
+                            # Only follow same-domain links
+                            if parsed.netloc == base_domain and full_url not in visited:
+                                # Remove fragments and normalize
+                                clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                                if parsed.query:
+                                    clean_url += f"?{parsed.query}"
+
+                                if clean_url not in visited:
+                                    to_visit.append((clean_url, depth + 1))
+
+        # Run the async crawler
+        try:
+            asyncio.get_event_loop().run_until_complete(run_crawler())
+        except RuntimeError:
+            # No event loop running, create a new one
+            asyncio.run(run_crawler())
+
+        if not documents:
+            raise ValueError(f"No pages could be crawled from: {source}")
+
+        return documents

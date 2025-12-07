@@ -190,3 +190,37 @@ def test_load_remote_no_files_found(mock_fsspec):
 
     with pytest.raises(ValueError, match="No files found"):
         loader._load_remote("s3://bucket/nonexistent/*.pdf")
+
+
+# Crawl URL tests
+
+
+def test_is_crawl_url():
+    """Test detection of crawl URLs."""
+    loader = DocumentLoader()
+
+    # Crawl URLs should be detected
+    assert loader._is_crawl_url("https://example.com/**")
+    assert loader._is_crawl_url("https://docs.example.com/api/**")
+    assert loader._is_crawl_url("http://localhost:8000/**")
+
+    # These should NOT be crawl URLs
+    assert not loader._is_crawl_url("https://example.com")
+    assert not loader._is_crawl_url("https://example.com/")
+    assert not loader._is_crawl_url("https://example.com/*.html")
+    assert not loader._is_crawl_url("s3://bucket/**")
+    assert not loader._is_crawl_url("./docs/**")
+
+
+@patch("piragi.loader._get_crawl4ai")
+def test_crawl_url_missing_dependency(mock_get_crawl4ai):
+    """Test helpful error message when crawl4ai is not installed."""
+    mock_get_crawl4ai.side_effect = ImportError(
+        "crawl4ai is required for recursive URL crawling. "
+        "Install it with: pip install piragi[crawler] or pip install crawl4ai"
+    )
+
+    loader = DocumentLoader()
+
+    with pytest.raises(ImportError, match="pip install piragi"):
+        loader._crawl_url("https://example.com/**")

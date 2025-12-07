@@ -20,7 +20,7 @@ Ragi(
 ```
 
 **Parameters:**
-- `sources` - File paths, URLs, glob patterns, or remote URIs (s3://, gs://, az://)
+- `sources` - File paths, URLs, glob patterns, remote URIs (s3://, gs://, az://), or crawl URLs (https://.../**)
 - `persist_dir` - Directory to persist vector database
 - `config` - Configuration dict (see Configuration section)
 - `store` - Vector store backend (URI string, dict, or VectorStoreProtocol instance)
@@ -223,6 +223,26 @@ Requires optional extras:
 - `pip install piragi[gcs]` for GCS
 - `pip install piragi[azure]` for Azure
 - `pip install piragi[remote]` for all
+
+## Web Crawling
+
+Recursively crawl websites using `/**` suffix:
+
+```python
+# Crawl entire site (same domain, max depth 3, max 100 pages)
+kb = Ragi("https://docs.example.com/**")
+
+# Crawl specific section
+kb = Ragi("https://docs.example.com/api/**")
+```
+
+Features:
+- Follows same-domain internal links only
+- Respects max depth (default: 3) and max pages (default: 100)
+- Uses crawl4ai with headless browser for JS rendering
+- Returns markdown content for each page
+
+Requires: `pip install piragi[crawler]`
 
 ## Supported File Formats
 

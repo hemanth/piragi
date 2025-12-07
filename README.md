@@ -24,6 +24,7 @@ ollama pull llama3.2
 pip install piragi[s3]       # S3 support
 pip install piragi[gcs]      # Google Cloud Storage
 pip install piragi[azure]    # Azure Blob Storage
+pip install piragi[crawler]  # Recursive web crawling
 pip install piragi[postgres] # PostgreSQL/pgvector
 pip install piragi[pinecone] # Pinecone
 pip install piragi[supabase] # Supabase
@@ -35,6 +36,7 @@ pip install piragi[all]      # Everything
 - **Zero Config** - Works with free local models out of the box
 - **All Formats** - PDF, Word, Excel, Markdown, Code, URLs, Images, Audio
 - **Remote Storage** - Read from S3, GCS, Azure, HDFS, SFTP with glob patterns
+- **Web Crawling** - Recursively crawl websites with `/**` syntax
 - **Auto-Updates** - Background refresh, queries never blocked
 - **Smart Citations** - Every answer includes sources
 - **Pluggable Stores** - LanceDB, PostgreSQL, Pinecone, Supabase, or custom
@@ -88,6 +90,29 @@ kb = Ragi([
 ```
 
 Requires optional extras: `pip install piragi[s3]`, `piragi[gcs]`, or `piragi[azure]`
+
+## Web Crawling
+
+Recursively crawl websites using `/**` suffix:
+
+```python
+# Crawl entire site
+kb = Ragi("https://docs.example.com/**")
+
+# Crawl specific section
+kb = Ragi("https://docs.example.com/api/**")
+
+# Mix with other sources
+kb = Ragi([
+    "./local-docs",
+    "https://docs.example.com/**",
+    "s3://bucket/data/*.pdf"
+])
+```
+
+Crawls same-domain links up to depth 3, max 100 pages by default.
+
+Requires: `pip install piragi[crawler]`
 
 ## Vector Store Backends
 
