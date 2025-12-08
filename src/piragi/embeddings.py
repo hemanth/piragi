@@ -78,7 +78,7 @@ class EmbeddingGenerator:
         # Process in batches for memory efficiency and progress reporting
         for i in range(0, total, batch_size):
             batch_texts = texts[i : i + batch_size]
-            batch_embeddings = self._generate_embeddings(batch_texts)
+            batch_embeddings = self._generate_embeddings(batch_texts, batch_size=batch_size)
             all_embeddings.extend(batch_embeddings)
 
             # Report progress
@@ -96,7 +96,7 @@ class EmbeddingGenerator:
 
         return chunks
 
-    def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def _generate_embeddings(self, texts: List[str], batch_size: int = None) -> List[List[float]]:
         """
         Generate embeddings for a list of texts.
 
@@ -118,9 +118,9 @@ class EmbeddingGenerator:
                 # Use local sentence-transformers
                 # Use encode_document for document chunks if available
                 if hasattr(self.model, "encode_document"):
-                    embeddings = self.model.encode_document(texts)
+                    embeddings = self.model.encode_document(texts, batch_size=batch_size)
                 else:
-                    embeddings = self.model.encode(texts)
+                    embeddings = self.model.encode(texts, batch_size=batch_size)
                 return embeddings
 
         except Exception as e:

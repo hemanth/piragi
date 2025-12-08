@@ -64,6 +64,7 @@ class Ragi:
                     - device: Device to use for local models (default: None for auto-detect)
                     - base_url: API base URL for remote embeddings (optional)
                     - api_key: API key for remote embeddings (optional)
+                    - batch_size: Number of chunks that progressively processed when generating embeddings (optional)
                 - chunk: Chunking configuration
                     - size: Chunk size in tokens (default: 512)
                     - overlap: Overlap in tokens (default: 50)
@@ -326,7 +327,9 @@ class Ragi:
         # Generate embeddings with per-batch progress
         _progress(f"Generating embeddings for {len(all_chunks)} chunks...")
         chunks_with_embeddings = self.embedder.embed_chunks(
-            all_chunks, on_progress=_progress
+            all_chunks,
+            on_progress=_progress,
+            batch_size=embed_cfg.get("batch_size", 32),
         )
         _progress("Embeddings complete")
 

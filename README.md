@@ -191,7 +191,8 @@ config = {
         "base_url": "http://localhost:11434/v1"
     },
     "embedding": {
-        "model": "all-mpnet-base-v2"
+        "model": "all-mpnet-base-v2",
+        "batch_size": 32
     },
     "chunk": {
         "strategy": "fixed",
