@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] - 2025-12-08
+
+### Fixed
+- Sentence boundary detection now uses pysbd for accurate handling of:
+  - Numbered lists (1. 2. 3.)
+  - Abbreviations (Dr., Mr., Prof., etc.)
+  - Acronyms (U.S., Ph.D., B.A.)
+  - Initials in names (J.K. Rowling, C.S. Lewis)
+- Fixes issue #10: Text chunking no longer mangles bulleted numbers and acronyms
+
+### Added
+- New dependency: pysbd>=0.3.4 for robust sentence boundary detection
+
 ## [0.7.3] - 2025-12-08
 
 ### Fixed
@@ -105,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata filtering
 - Auto-updates with background workers
 
+[0.7.4]: https://github.com/hemanth/piragi/releases/tag/v0.7.4
 [0.7.3]: https://github.com/hemanth/piragi/releases/tag/v0.7.3
 [0.7.2]: https://github.com/hemanth/piragi/releases/tag/v0.7.2
 [0.7.1]: https://github.com/hemanth/piragi/releases/tag/v0.7.1

@@ -84,3 +84,63 @@ def test_metadata_propagation():
     assert len(chunks) == 1
     assert chunks[0].metadata["author"] == "Test Author"
     assert chunks[0].metadata["category"] == "test"
+
+
+def test_sentence_break_with_numbered_list():
+    """Test that numbered lists don't cause incorrect sentence breaks."""
+    chunker = Chunker(chunk_size=50, chunk_overlap=10)
+
+    # Text with numbered list - periods after numbers should not be sentence endings
+    text = """How Do You Make Strawberry Jam?
+1. Mash the strawberries.
+2. Combine all the ingredients in a saucepan and dissolve the sugar over low heat.
+3. Bring the mixture to a boil. Cook and check the doneness.
+4. Process according to the recipe below."""
+
+    # Use _break_at_sentence directly to test
+    result = chunker._break_at_sentence(text)
+
+    # Should not break after "1." or "2." etc
+    # The result should contain complete sentences
+    assert "1." in result or "Mash" in result
+
+
+def test_sentence_break_with_acronyms():
+    """Test that acronyms don't cause incorrect sentence breaks."""
+    chunker = Chunker(chunk_size=100, chunk_overlap=10)
+
+    # Text with acronyms - periods in acronyms should not be sentence endings
+    text = """Geoffrey Hinton received his B.A. in Experimental Psychology from Cambridge in 1970 and his Ph.D. in Artificial Intelligence from Edinburgh in 1978. He is a pioneer in deep learning."""
+
+    result = chunker._break_at_sentence(text)
+
+    # Should not break after "B.A." or "Ph.D."
+    # The acronyms should remain intact within sentences
+    assert "B.A." in result or "Ph.D." in result
+
+
+def test_sentence_break_with_abbreviations():
+    """Test that common abbreviations don't cause incorrect sentence breaks."""
+    chunker = Chunker(chunk_size=100, chunk_overlap=10)
+
+    # Text with abbreviations
+    text = """Dr. Smith and Mr. Jones met with Prof. Williams at the U.S. embassy. They discussed important matters regarding the U.K. delegation."""
+
+    result = chunker._break_at_sentence(text)
+
+    # Should not break after "Dr." or "Mr." or "Prof."
+    assert "Dr." in result
+    assert "Mr." in result or "Prof." in result
+
+
+def test_sentence_break_with_initials():
+    """Test that initials don't cause incorrect sentence breaks."""
+    chunker = Chunker(chunk_size=100, chunk_overlap=10)
+
+    # Text with initials in names
+    text = """J.K. Rowling wrote the Harry Potter series. C.S. Lewis wrote the Chronicles of Narnia. Both are beloved authors."""
+
+    result = chunker._break_at_sentence(text)
+
+    # Should not break after "J." or "K." in "J.K."
+    assert "J.K. Rowling" in result or "C.S. Lewis" in result

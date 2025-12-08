@@ -3,6 +3,7 @@
 import re
 from typing import List
 
+import pysbd
 from transformers import AutoTokenizer
 
 from .types import Chunk, Document
@@ -28,6 +29,7 @@ class Chunker:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self._segmenter = pysbd.Segmenter(language="en", clean=False)
 
     def chunk_document(self, document: Document) -> List[Chunk]:
         """
@@ -142,16 +144,28 @@ class Chunker:
         return chunks
 
     def _break_at_sentence(self, text: str) -> str:
-        """Try to break text at a sentence boundary."""
-        # Look for sentence endings
-        sentence_endings = [". ", ".\n", "? ", "?\n", "! ", "!\n"]
+        """Try to break text at a sentence boundary using pysbd.
 
-        for ending in sentence_endings:
-            if ending in text:
-                # Find the last occurrence
-                idx = text.rfind(ending)
-                if idx > len(text) * 0.5:  # Only if it's in the latter half
-                    return text[: idx + len(ending)]
+        Uses pysbd for accurate sentence boundary detection that handles:
+        - Numbered lists (1. 2. 3.)
+        - Abbreviations (Dr., Mr., etc.)
+        - Acronyms (U.S., Ph.D., B.A.)
+        - Initials (J.K. Rowling)
+        """
+        sentences = self._segmenter.segment(text)
+
+        if len(sentences) <= 1:
+            return text
+
+        # Find a break point in the latter half of the text
+        half_len = len(text) * 0.5
+        accumulated = ""
+
+        for sentence in sentences:
+            accumulated += sentence
+            # Break after a sentence that ends past the halfway point
+            if len(accumulated) >= half_len:
+                return accumulated
 
         # If no good break point, return as is
         return text
