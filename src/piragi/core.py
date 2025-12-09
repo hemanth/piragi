@@ -64,7 +64,7 @@ class Ragi:
                     - device: Device to use for local models (default: None for auto-detect)
                     - base_url: API base URL for remote embeddings (optional)
                     - api_key: API key for remote embeddings (optional)
-                    - batch_size: Number of chunks that progressively processed when generating embeddings (optional)
+                    - batch_size: Number of chunks that is progressively processed when generating embeddings (default: 32)
                 - chunk: Chunking configuration
                     - size: Chunk size in tokens (default: 512)
                     - overlap: Overlap in tokens (default: 50)
@@ -178,6 +178,7 @@ class Ragi:
             device=embed_cfg.get("device"),
             base_url=embed_cfg.get("base_url"),
             api_key=embed_cfg.get("api_key"),
+            batch_size=embed_cfg.get("batch_size", 32),
         )
 
         # Vector store - supports multiple backends
@@ -329,7 +330,6 @@ class Ragi:
         chunks_with_embeddings = self.embedder.embed_chunks(
             all_chunks,
             on_progress=_progress,
-            batch_size=embed_cfg.get("batch_size", 32),
         )
         _progress("Embeddings complete")
 

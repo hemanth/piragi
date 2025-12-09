@@ -15,6 +15,7 @@ class EmbeddingGenerator:
         device: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
+        batch_size: int = 32
     ) -> None:
         """
         Initialize the embedding generator.
@@ -29,7 +30,8 @@ class EmbeddingGenerator:
         self.base_url = base_url
         self.api_key = api_key
         self.use_remote = base_url is not None
-
+        self.batch_size = batch_size
+                    
         if self.use_remote:
             # Use OpenAI-compatible API client
             from openai import OpenAI
@@ -54,7 +56,6 @@ class EmbeddingGenerator:
         self,
         chunks: List[Chunk],
         on_progress: Optional[Callable[[str], None]] = None,
-        batch_size: int = 32,
     ) -> List[Chunk]:
         """
         Generate embeddings for a list of chunks.
@@ -62,7 +63,6 @@ class EmbeddingGenerator:
         Args:
             chunks: List of chunks to embed
             on_progress: Optional callback for progress updates
-            batch_size: Number of chunks to process per batch (default: 32)
 
         Returns:
             Chunks with embeddings added
@@ -76,14 +76,14 @@ class EmbeddingGenerator:
         total = len(texts)
 
         # Process in batches for memory efficiency and progress reporting
-        for i in range(0, total, batch_size):
-            batch_texts = texts[i : i + batch_size]
-            batch_embeddings = self._generate_embeddings(batch_texts, batch_size=batch_size)
+        for i in range(0, total, self.batch_size):
+            batch_texts = texts[i : i + self.batch_size]
+            batch_embeddings = self._generate_embeddings(batch_texts, batch_size=self.batch_size)
             all_embeddings.extend(batch_embeddings)
 
             # Report progress
             if on_progress:
-                completed = min(i + batch_size, total)
+                completed = min(i + self.batch_size, total)
                 on_progress(f"Embedded {completed}/{total} chunks")
 
         # Add embeddings to chunks
