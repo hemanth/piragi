@@ -61,7 +61,7 @@ class Ragi:
                     - api_key: API key (default: "not-needed")
                 - embedding: Embedding configuration
                     - model: Model name (default: "all-mpnet-base-v2")
-                    - device: Device to use for local models (default: None for auto-detect)
+                    - device: Device to use for local embedding models (default: None for auto-detect)
                     - base_url: API base URL for remote embeddings (optional)
                     - api_key: API key for remote embeddings (optional)
                 - chunk: Chunking configuration
@@ -73,6 +73,7 @@ class Ragi:
                     - use_hyde: Enable HyDE (default: False)
                     - use_hybrid_search: Enable BM25 + vector hybrid (default: False)
                     - use_cross_encoder: Enable cross-encoder reranking (default: False)
+                    - cross_encoder_device: Device to use for local cross-encoder reranking models (default: embedding's "device")
                     - cross_encoder_model: Model for cross-encoder (default: "cross-encoder/ms-marco-MiniLM-L-6-v2")
                     - vector_weight: Weight for vector similarity in hybrid (default: 0.5)
                     - bm25_weight: Weight for BM25 in hybrid (default: 0.5)
@@ -222,7 +223,7 @@ class Ragi:
                     "cross_encoder_model",
                     "cross-encoder/ms-marco-MiniLM-L-6-v2"
                 ),
-                device=embed_cfg.get("device"),
+                device=retrieval_cfg.get("cross_encoder_device", embed_cfg.get("device")),
             )
 
         # LLM / Basic retriever
