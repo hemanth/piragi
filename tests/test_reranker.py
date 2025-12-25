@@ -120,6 +120,23 @@ class TestCrossEncoderReranker:
         )
         assert "L-12" in reranker.model_name
 
+    def test_init_trust_remote_code(self):
+        """Test initialization with trust_remote_code for custom models (issue #15)."""
+        # Default should be False
+        reranker = CrossEncoderReranker()
+        assert reranker._trust_remote_code is False
+
+        # Explicit True
+        reranker_trusted = CrossEncoderReranker(trust_remote_code=True)
+        assert reranker_trusted._trust_remote_code is True
+
+        # For models like Alibaba-NLP/gte-multilingual-reranker-base
+        reranker_alibaba = CrossEncoderReranker(
+            model_name="Alibaba-NLP/gte-multilingual-reranker-base",
+            trust_remote_code=True
+        )
+        assert reranker_alibaba._trust_remote_code is True
+
     def test_rerank_empty_citations(self):
         """Test reranking with empty citations."""
         reranker = CrossEncoderReranker()
