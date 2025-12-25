@@ -59,6 +59,24 @@ class CrossEncoderReranker:
                     device=self._device,
                     trust_remote_code=self._trust_remote_code,
                 )
+                
+                # Fix for models without pad_token_id (e.g., Qwen3 rerankers)
+                # Batch inference fails if pad_token_id is not defined
+                # Fallback to eos_token_id when available (fixes #14)
+                try:
+                    model_cfg = getattr(self._model, "model", None)
+                    if model_cfg and hasattr(model_cfg, "config"):
+                        cfg = model_cfg.config
+                        if getattr(cfg, "pad_token_id", None) is None:
+                            eos = getattr(cfg, "eos_token_id", None)
+                            if eos is not None:
+                                cfg.pad_token_id = eos
+                                logger.debug(f"Missing pad_token_id detected; set to eos_token_id={eos}")
+                            else:
+                                logger.warning("Neither pad_token_id nor eos_token_id present in model config")
+                except Exception as e:
+                    logger.warning(f"Failed to adjust pad_token_id on CrossEncoder: {e}")
+                
                 logger.info(f"Loaded cross-encoder model: {self.model_name}")
             except ImportError:
                 raise ImportError(
