@@ -76,6 +76,8 @@ class Ragi:
                     - use_cross_encoder: Enable cross-encoder reranking (default: False)
                     - cross_encoder_device: Device to use for local cross-encoder reranking models (default: embedding's "device")
                     - cross_encoder_model: Model for cross-encoder (default: "cross-encoder/ms-marco-MiniLM-L-6-v2")
+                    - trust_remote_code: Trust remote code for custom reranker models (default: False)
+                        Required for models like "Alibaba-NLP/gte-multilingual-reranker-base"
                     - vector_weight: Weight for vector similarity in hybrid (default: 0.5)
                     - bm25_weight: Weight for BM25 in hybrid (default: 0.5)
                 - auto_update: Auto-update configuration (enabled by default)
@@ -226,6 +228,7 @@ class Ragi:
                     "cross-encoder/ms-marco-MiniLM-L-6-v2"
                 ),
                 device=retrieval_cfg.get("cross_encoder_device", embed_cfg.get("device")),
+                trust_remote_code=retrieval_cfg.get("trust_remote_code", False),
             )
 
         # LLM / Basic retriever

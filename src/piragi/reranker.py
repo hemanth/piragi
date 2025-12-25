@@ -25,6 +25,7 @@ class CrossEncoderReranker:
         model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
         device: Optional[str] = None,
         batch_size: int = 32,
+        trust_remote_code: bool = False,
     ) -> None:
         """
         Initialize the cross-encoder reranker.
@@ -35,13 +36,17 @@ class CrossEncoderReranker:
                 - "cross-encoder/ms-marco-MiniLM-L-12-v2" (slower, better quality)
                 - "BAAI/bge-reranker-base" (good multilingual support)
                 - "BAAI/bge-reranker-large" (best quality, slowest)
+                - "Alibaba-NLP/gte-multilingual-reranker-base" (requires trust_remote_code=True)
             device: Device to run on ('cuda', 'cpu', or None for auto-detect)
             batch_size: Batch size for scoring
+            trust_remote_code: Whether to trust remote code for custom models
+                (required for some models like Alibaba-NLP/gte-multilingual-reranker-base)
         """
         self.model_name = model_name
         self.batch_size = batch_size
         self._model = None
         self._device = device
+        self._trust_remote_code = trust_remote_code
 
     def _load_model(self):
         """Lazy load the cross-encoder model."""
@@ -52,6 +57,7 @@ class CrossEncoderReranker:
                 self._model = CrossEncoder(
                     self.model_name,
                     device=self._device,
+                    trust_remote_code=self._trust_remote_code,
                 )
                 logger.info(f"Loaded cross-encoder model: {self.model_name}")
             except ImportError:
@@ -250,6 +256,7 @@ class HybridReranker:
         cross_encoder_top_n: int = 20,
         tfidf_vector_weight: float = 0.6,
         device: Optional[str] = None,
+        trust_remote_code: bool = False,
     ):
         """
         Initialize hybrid reranker.
@@ -260,6 +267,7 @@ class HybridReranker:
             cross_encoder_top_n: Number of candidates to pass to cross-encoder
             tfidf_vector_weight: Weight for vector vs TF-IDF in first stage
             device: Device for cross-encoder
+            trust_remote_code: Whether to trust remote code for custom models
         """
         self.use_cross_encoder = use_cross_encoder
         self.cross_encoder_top_n = cross_encoder_top_n
@@ -276,6 +284,7 @@ class HybridReranker:
             self._cross_encoder = CrossEncoderReranker(
                 model_name=cross_encoder_model,
                 device=device,
+                trust_remote_code=trust_remote_code,
             )
 
     def rerank(
