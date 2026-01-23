@@ -17,6 +17,7 @@ class Chunker:
         chunk_size: int = 512,
         chunk_overlap: int = 50,
         tokenizer_name: str = "nvidia/llama-embed-nemotron-8b",
+        min_chunk_length: int = 0,
     ) -> None:
         """
         Initialize the chunker.
@@ -25,9 +26,14 @@ class Chunker:
             chunk_size: Target chunk size in tokens
             chunk_overlap: Number of tokens to overlap between chunks
             tokenizer_name: Tokenizer to use (default: nvidia/llama-embed-nemotron-8b)
+            min_chunk_length: Minimum chunk length in characters. Chunks shorter than
+                this (after stripping whitespace) will be filtered out. Useful for
+                removing garbage chunks like navigation elements, short headers, etc.
+                Default is 0 (no filtering).
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.min_chunk_length = min_chunk_length
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self._segmenter = pysbd.Segmenter(language="en", clean=False)
 
@@ -39,7 +45,7 @@ class Chunker:
             document: Document to chunk
 
         Returns:
-            List of chunks
+            List of chunks (filtered by min_chunk_length if set)
         """
         # Split by markdown headers first to respect document structure
         sections = self._split_by_headers(document.content)
@@ -55,6 +61,16 @@ class Chunker:
         # Add document metadata to all chunks
         for chunk in chunks:
             chunk.metadata.update(document.metadata)
+
+        # Filter out short chunks if min_chunk_length is set
+        if self.min_chunk_length > 0:
+            chunks = [
+                chunk for chunk in chunks
+                if len(chunk.text.strip()) >= self.min_chunk_length
+            ]
+            # Re-index chunks after filtering
+            for i, chunk in enumerate(chunks):
+                chunk.chunk_index = i
 
         return chunks
 
