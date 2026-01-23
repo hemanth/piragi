@@ -26,7 +26,7 @@ def create_mock_embedding_generator(mock_embeddings):
     """Create a mock EmbeddingGenerator for testing."""
     mock_gen = MagicMock()
 
-    def embed_chunks_side_effect(chunks):
+    def embed_chunks_side_effect(chunks, on_progress=None):
         for chunk in chunks:
             chunk.embedding = mock_embeddings
         return chunks
