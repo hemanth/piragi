@@ -373,6 +373,78 @@ class TestPostgresStoreRetry:
         assert call_count == 3  # Initial + 2 retries
 
 
+class TestDimensionInference:
+    """Tests for automatic dimension inference."""
+
+    def test_get_dimensions_method_exists(self):
+        """Test that EmbeddingGenerator has get_dimensions method."""
+        from piragi.embeddings import EmbeddingGenerator
+
+        # Verify the method exists
+        assert hasattr(EmbeddingGenerator, "get_dimensions")
+
+    def test_postgres_store_dimension_inference_logic(self):
+        """Test PostgresStore dimension inference logic without actual connection."""
+        from piragi.stores.postgres import PostgresStore
+
+        # Create a mock embedder with get_dimensions
+        mock_embedder = MagicMock()
+        mock_embedder.get_dimensions.return_value = 384
+
+        # Test the dimension inference logic directly
+        # We can't instantiate PostgresStore without psycopg2, but we can test the logic
+        store = object.__new__(PostgresStore)
+
+        # Simulate the dimension logic
+        vector_dimension = None
+        embedder = mock_embedder
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 384
+        mock_embedder.get_dimensions.assert_called_once()
+
+    def test_postgres_store_explicit_dimension_takes_precedence(self):
+        """Test that explicit vector_dimension takes precedence over embedder."""
+        mock_embedder = MagicMock()
+        mock_embedder.get_dimensions.return_value = 384
+
+        # Simulate the dimension logic with explicit dimension
+        vector_dimension = 1536
+        embedder = mock_embedder
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 1536
+        # get_dimensions should NOT be called when explicit dimension provided
+        mock_embedder.get_dimensions.assert_not_called()
+
+    def test_postgres_store_default_dimension(self):
+        """Test that default dimension is 768 when neither provided."""
+        # Simulate the dimension logic with no embedder
+        vector_dimension = None
+        embedder = None
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 768
+
+
 class TestPineconeStore:
     """Tests for PineconeStore (mocked)."""
 

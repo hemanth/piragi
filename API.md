@@ -222,25 +222,29 @@ kb = Ragi("./docs", store="s3://bucket/indices")  # S3-backed
 kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
 ```
 
-Direct store configuration with retry options:
+Direct store configuration with all options:
 ```python
+from piragi import EmbeddingGenerator
 from piragi.stores import PostgresStore
 
+# Create embedder first
+embedder = EmbeddingGenerator(model="all-MiniLM-L6-v2")
+
+# Auto-infer dimensions from embedder (384 for MiniLM)
 store = PostgresStore(
     connection_string="postgres://user:pass@localhost/db",
     table_name="chunks",           # Table name (default: "chunks")
-    vector_dimension=768,          # Vector dimensions (default: 768, or auto-inferred)
     max_retries=3,                 # Retry attempts for transient failures (default: 3)
     retry_delay=0.5,               # Base delay between retries in seconds (default: 0.5)
     embedder=embedder,             # Optional: auto-infer dimensions from embedder
 )
-kb = Ragi("./docs", store=store)
+kb = Ragi("./docs", store=store, embedder=embedder)
 ```
 
-The PostgresStore includes automatic connection resilience:
-- Retries on "transaction aborted" errors
-- Reconnects on connection failures
-- Exponential backoff between retries
+The PostgresStore includes:
+- **Auto-dimension inference**: Pass an embedder to automatically detect vector dimensions
+- **Connection resilience**: Automatic retries on transient failures with exponential backoff
+- Handles "transaction aborted" errors and connection failures
 
 Requires: `pip install piragi[postgres]`
 
