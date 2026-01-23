@@ -126,6 +126,24 @@ class EmbeddingGenerator:
         except Exception as e:
             raise RuntimeError(f"Failed to generate embeddings: {e}")
 
+    def get_dimensions(self) -> int:
+        """
+        Get the embedding dimensions by inferring from a test embedding.
+
+        This is useful when you need to know the vector dimensions without
+        hardcoding them, e.g., for initializing a vector store.
+
+        Returns:
+            Number of dimensions in the embedding vector
+
+        Examples:
+            >>> embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+            >>> dims = embedder.get_dimensions()
+            >>> print(dims)  # 768
+        """
+        test_embedding = self.embed_query("dimension test")
+        return len(test_embedding)
+
     def embed_query(self, query: str, task_instruction: str | None = None) -> List[float]:
         """
         Generate embedding for a single query.

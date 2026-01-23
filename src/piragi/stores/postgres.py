@@ -2,12 +2,10 @@
 
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, TypeVar
-
+from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
 import json
 
 from ..types import Chunk, Citation
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..embeddings import EmbeddingGenerator
@@ -50,10 +48,10 @@ class PostgresStore:
         >>>
         >>> # Auto-infer dimensions from embedder
         >>> from piragi import EmbeddingGenerator
-        >>> embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+        >>> embedder = EmbeddingGenerator(model="all-MiniLM-L6-v2")
         >>> store = PostgresStore(
         ...     connection_string="postgres://...",
-        ...     embedder=embedder  # Automatically detects 768 dimensions
+        ...     embedder=embedder  # Automatically detects 384 dimensions
         ... )
     """
 
