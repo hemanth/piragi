@@ -16,6 +16,7 @@ Ragi(
     persist_dir: str = ".piragi",
     config: Optional[Dict[str, Any]] = None,
     store: Union[str, Dict, VectorStoreProtocol, None] = None,
+    embedder: Optional[EmbeddingGenerator] = None,
 )
 ```
 
@@ -24,6 +25,7 @@ Ragi(
 - `persist_dir` - Directory to persist vector database
 - `config` - Configuration dict (see Configuration section)
 - `store` - Vector store backend (URI string, dict, or VectorStoreProtocol instance)
+- `embedder` - Custom EmbeddingGenerator instance. If provided, this embedder is used instead of creating one from config. Useful for sharing a single embedder across multiple Ragi instances to reduce memory usage.
 
 **Examples:**
 ```python
@@ -43,6 +45,12 @@ kb = Ragi("./docs", config={
 
 # Custom store
 kb = Ragi("./docs", store="postgres://user:pass@localhost/db")
+
+# Shared embedder (reduces memory when using multiple instances)
+from piragi import EmbeddingGenerator
+embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+kb1 = Ragi("./docs1", embedder=embedder)
+kb2 = Ragi("./docs2", embedder=embedder)  # Shares same embedder
 ```
 
 ### Methods
@@ -92,6 +100,64 @@ Number of chunks in the knowledge base.
 
 #### `clear() -> None`
 Clear all data.
+
+## AsyncRagi
+
+Async wrapper for use with async web frameworks (FastAPI, Starlette, aiohttp).
+
+```python
+from piragi import AsyncRagi
+```
+
+### Constructor
+
+```python
+AsyncRagi(
+    sources: Union[str, List[str], None] = None,
+    persist_dir: str = ".piragi",
+    config: Optional[Dict[str, Any]] = None,
+    store: Union[str, Dict, VectorStoreProtocol, None] = None,
+    graph: bool = False,
+    embedder: Optional[EmbeddingGenerator] = None,
+)
+```
+
+**Parameters:** Same as Ragi (see above).
+
+**Examples:**
+```python
+# Basic async usage
+kb = AsyncRagi("./docs")
+answer = await kb.ask("How do I deploy?")
+
+# With progress tracking
+async for progress in kb.add("./large-docs", progress=True):
+    print(progress)
+
+# Shared embedder across async instances
+from piragi import EmbeddingGenerator
+embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+kb1 = AsyncRagi("./docs1", embedder=embedder)
+kb2 = AsyncRagi("./docs2", embedder=embedder)
+
+# With FastAPI
+@app.post("/search")
+async def search(query: str):
+    return await kb.ask(query)
+```
+
+### Methods
+
+All methods are async versions of Ragi methods:
+- `await kb.add(sources)` - Add documents
+- `await kb.ask(query)` - Ask a question
+- `await kb.retrieve(query)` - Retrieve chunks
+- `await kb.refresh(sources)` - Refresh sources
+- `await kb.count()` - Get chunk count
+- `await kb.clear()` - Clear data
+- `kb.filter(**kwargs)` - Filter (sync, returns self for chaining)
+
+---
 
 ## Data Types
 

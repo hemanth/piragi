@@ -203,6 +203,91 @@ class TestRagiFilter:
         assert isinstance(answer, Answer)
 
 
+class TestRagiEmbedderInjection:
+    """Tests for custom embedder injection."""
+
+    def test_init_with_custom_embedder(self, temp_dir, mock_embeddings):
+        """Test initialization with custom embedder."""
+        mock_embedder = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir, embedder=mock_embedder)
+
+        # Verify custom embedder is used
+        assert kb.embedder is mock_embedder
+
+    def test_custom_embedder_used_for_add(
+        self, temp_dir, sample_text_file, mock_embeddings
+    ):
+        """Test that custom embedder is used when adding documents."""
+        mock_embedder = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir, embedder=mock_embedder)
+        kb.add(sample_text_file)
+
+        # Verify embedder's embed_chunks was called
+        mock_embedder.embed_chunks.assert_called()
+        assert kb.count() > 0
+
+    def test_shared_embedder_across_instances(self, temp_dir, mock_embeddings):
+        """Test that same embedder can be shared across multiple Ragi instances."""
+        mock_embedder = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir1 = os.path.join(temp_dir, "test_ragi1")
+        persist_dir2 = os.path.join(temp_dir, "test_ragi2")
+
+        kb1 = Ragi(persist_dir=persist_dir1, embedder=mock_embedder)
+        kb2 = Ragi(persist_dir=persist_dir2, embedder=mock_embedder)
+
+        # Both instances should share the same embedder
+        assert kb1.embedder is kb2.embedder
+        assert kb1.embedder is mock_embedder
+
+    def test_custom_embedder_overrides_config(self, temp_dir, mock_embeddings):
+        """Test that custom embedder takes precedence over config."""
+        mock_embedder = create_mock_embedding_generator(mock_embeddings)
+        mock_embedder.model_name = "custom-model"
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(
+            persist_dir=persist_dir,
+            embedder=mock_embedder,
+            config={"embedding": {"model": "different-model"}}
+        )
+
+        # Custom embedder should be used, not the one from config
+        assert kb.embedder is mock_embedder
+
+    @patch("piragi.retrieval.OpenAI")
+    def test_custom_embedder_used_for_query(
+        self,
+        mock_openai,
+        temp_dir,
+        sample_text_file,
+        mock_embeddings,
+        mock_llm_response,
+    ):
+        """Test that custom embedder is used for query embedding."""
+        mock_embedder = create_mock_embedding_generator(mock_embeddings)
+
+        # Mock LLM response
+        mock_client = MagicMock()
+        mock_completion = MagicMock()
+        mock_completion.choices = [MagicMock(message=MagicMock(content=mock_llm_response))]
+        mock_client.chat.completions.create.return_value = mock_completion
+        mock_openai.return_value = mock_client
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir, embedder=mock_embedder)
+        kb.add(sample_text_file)
+
+        kb.ask("What is this?")
+
+        # Verify embed_query was called for the search
+        mock_embedder.embed_query.assert_called()
+
+
 class TestRagiUtility:
     """Tests for utility methods."""
 
