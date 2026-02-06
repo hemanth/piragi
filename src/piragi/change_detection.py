@@ -1,12 +1,15 @@
 """Change detection for automatic updates."""
 
 import hashlib
+import logging
 import os
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ChangeDetector:
@@ -61,8 +64,8 @@ class ChangeDetector:
                 content = f.read()
             current_hash = ChangeDetector.compute_content_hash(content)
             return current_hash != stored_hash
-        except Exception:
-            # If we can't read, assume changed to be safe
+        except (OSError, ValueError) as e:
+            logger.warning(f"Failed to read {source}: {e}")
             return True
 
     @staticmethod
@@ -71,7 +74,7 @@ class ChangeDetector:
         stored_etag: Optional[str],
         stored_last_modified: Optional[str],
         timeout: int = 10,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Check if a URL has changed using HTTP headers.
         Uses conditional requests for minimal latency.
@@ -136,7 +139,7 @@ class ChangeDetector:
             return {"changed": False, "error": str(e)}
 
     @staticmethod
-    def get_file_metadata(source: str, content: str) -> Dict[str, any]:
+    def get_file_metadata(source: str, content: str) -> Dict[str, Any]:
         """
         Get metadata for a file source.
 
@@ -163,7 +166,7 @@ class ChangeDetector:
     @staticmethod
     def get_url_metadata(
         source: str, content: str, timeout: int = 10
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Get metadata for a URL source.
 

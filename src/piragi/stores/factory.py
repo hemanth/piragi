@@ -45,10 +45,11 @@ def parse_store_uri(uri: str) -> Dict[str, Any]:
     elif scheme == "pinecone":
         # Pinecone: pinecone://index-name?api_key=...
         query_params = parse_qs(parsed.query)
+        api_key = query_params.get("api_key", [""])[0]
         return {
             "type": "pinecone",
             "index_name": parsed.netloc or parsed.path.strip("/"),
-            "api_key": query_params.get("api_key", [""])[0],
+            "api_key": api_key,
             "environment": query_params.get("environment", [None])[0],
             "namespace": query_params.get("namespace", ["default"])[0],
         }

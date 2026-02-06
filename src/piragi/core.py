@@ -1,14 +1,14 @@
 """Core Ragi class - the main interface for piragi."""
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .chunking import Chunker
 from .embeddings import EmbeddingGenerator
 from .loader import DocumentLoader
 from .retrieval import Retriever
 from .stores import VectorStoreProtocol, create_store
-from .types import Answer, Chunk, Document, ChunkHook, DocumentHook
+from .types import Answer, Chunk, Citation, Document, ChunkHook, DocumentHook
 from .async_updater import AsyncUpdater
 from .change_detection import ChangeDetector
 
@@ -284,7 +284,7 @@ class Ragi:
     def add(
         self,
         sources: Union[str, List[str]],
-        on_progress: Optional[callable] = None,
+        on_progress: Optional[Callable[[str], None]] = None,
     ) -> "Ragi":
         """
         Add documents to the knowledge base.
@@ -519,7 +519,7 @@ class Ragi:
         self,
         query: str,
         top_k: int = 5,
-    ) -> List:
+    ) -> List[Citation]:
         """
         Retrieve relevant chunks without LLM generation.
 
