@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.9] - 2026-02-06
+
+### Fixed
+- Version mismatch between `__init__.py` and `pyproject.toml` (synced to 0.7.9)
+- Makefile test-cov target referenced wrong package name (`ragi` → `piragi`)
+- Project URLs pointed to `hemanth/ragi` instead of `hemanth/piragi`
+- mypy/ruff/black target versions aligned to `py310` (matching `requires-python`)
+- `change_detection.py` type hints: `Dict[str, any]` → `Dict[str, Any]` (3 occurrences)
+- `core.py` type hint: `callable` → `Callable[[str], None]` for `on_progress`
+- `core.py` return type: `retrieve()` now correctly typed as `List[Citation]`
+- `retrieval.py` bare exception in `expand_query()` now logs the error
+- `change_detection.py` bare exception now catches specific `OSError`/`ValueError` with logging
+- `loader.py` deprecated `get_event_loop()` replaced with safe async pattern
+- `.env.example` removed `sk-` prefix from placeholder API keys
+
+### Added
+- Python 3.13 classifier in `pyproject.toml`
+- Coverage failure threshold (`--cov-fail-under=60`) in pytest config
+- Logging to `retrieval.py` and `change_detection.py` modules
+
 ## [0.7.5] - 2025-12-08
 
 ### Added

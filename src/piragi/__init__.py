@@ -51,7 +51,7 @@ from .stores import (
     PineconeStore,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.7.9"
 __all__ = [
     # Core
     "Ragi",

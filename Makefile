@@ -20,7 +20,7 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov=ragi --cov-report=term-missing --cov-report=html
+	pytest --cov=piragi --cov-report=term-missing --cov-report=html
 
 format:
 	black src/ tests/ examples/

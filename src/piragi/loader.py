@@ -406,9 +406,15 @@ class DocumentLoader:
 
         # Run the async crawler
         try:
-            asyncio.get_event_loop().run_until_complete(run_crawler())
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No event loop running, create a new one
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                pool.submit(asyncio.run, run_crawler()).result()
+        else:
             asyncio.run(run_crawler())
 
         if not documents:
