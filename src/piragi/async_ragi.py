@@ -5,6 +5,7 @@ import queue
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 from .core import Ragi
+from .embeddings import EmbeddingGenerator
 from .stores import VectorStoreProtocol
 from .types import Answer
 
@@ -26,6 +27,12 @@ class AsyncRagi:
         >>> async for progress in kb.add("./large-docs", progress=True):
         >>>     print(progress)
         >>>
+        >>> # With shared embedder
+        >>> from piragi import EmbeddingGenerator
+        >>> embedder = EmbeddingGenerator(model="custom-model")
+        >>> kb1 = AsyncRagi("./docs1", embedder=embedder)
+        >>> kb2 = AsyncRagi("./docs2", embedder=embedder)
+        >>>
         >>> # With FastAPI
         >>> @app.post("/ingest")
         >>> async def ingest(files: list[str]):
@@ -40,6 +47,7 @@ class AsyncRagi:
         config: Optional[Dict[str, Any]] = None,
         store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
         graph: bool = False,
+        embedder: Optional[EmbeddingGenerator] = None,
     ) -> None:
         """
         Initialize AsyncRagi with optional document sources.
@@ -50,6 +58,9 @@ class AsyncRagi:
             config: Configuration dict (see Ragi for options)
             store: Vector store backend
             graph: Enable knowledge graph
+            embedder: Optional custom EmbeddingGenerator instance. If provided, this
+                embedder will be used instead of creating a new one from config.
+                Useful for sharing a single embedder across multiple AsyncRagi instances.
         """
         self._sync = Ragi(
             sources=sources,
@@ -57,6 +68,7 @@ class AsyncRagi:
             config=config,
             store=store,
             graph=graph,
+            embedder=embedder,
         )
 
     def add(

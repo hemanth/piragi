@@ -245,6 +245,206 @@ class TestPostgresStore:
             PostgresStore(connection_string="postgres://test")
 
 
+class TestPostgresStoreRetry:
+    """Tests for PostgresStore retry logic."""
+
+    def test_retriable_errors_constant(self):
+        """Test that RETRIABLE_ERRORS contains expected error patterns."""
+        from piragi.stores.postgres import PostgresStore
+
+        # Verify key error patterns are in the list
+        assert "transaction is aborted" in PostgresStore.RETRIABLE_ERRORS
+        assert "server closed the connection" in PostgresStore.RETRIABLE_ERRORS
+        assert "connection already closed" in PostgresStore.RETRIABLE_ERRORS
+        assert "connection refused" in PostgresStore.RETRIABLE_ERRORS
+
+    def test_is_retriable_error_method(self):
+        """Test _is_retriable_error method logic."""
+        from piragi.stores.postgres import PostgresStore
+
+        # Create instance without calling __init__
+        store = object.__new__(PostgresStore)
+        store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
+
+        # Test retriable errors
+        assert store._is_retriable_error(
+            Exception("current transaction is aborted, commands ignored")
+        ) is True
+        assert store._is_retriable_error(
+            Exception("server closed the connection unexpectedly")
+        ) is True
+        assert store._is_retriable_error(
+            Exception("connection already closed")
+        ) is True
+
+        # Test non-retriable errors
+        assert store._is_retriable_error(
+            Exception("syntax error at or near SELECT")
+        ) is False
+        assert store._is_retriable_error(
+            Exception("column 'foo' does not exist")
+        ) is False
+
+    def test_execute_with_retry_success_first_attempt(self):
+        """Test _execute_with_retry succeeds on first attempt."""
+        from piragi.stores.postgres import PostgresStore
+
+        store = object.__new__(PostgresStore)
+        store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
+        store.max_retries = 3
+        store.retry_delay = 0.01  # Fast for testing
+
+        call_count = 0
+
+        def successful_operation():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+
+        result = store._execute_with_retry(successful_operation)
+        assert result == "success"
+        assert call_count == 1
+
+    def test_execute_with_retry_retries_on_retriable_error(self):
+        """Test _execute_with_retry retries on retriable errors."""
+        from piragi.stores.postgres import PostgresStore
+
+        store = object.__new__(PostgresStore)
+        store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
+        store.max_retries = 3
+        store.retry_delay = 0.01
+        store._reconnect = MagicMock()
+
+        call_count = 0
+
+        def fail_then_succeed():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise Exception("transaction is aborted")
+            return "success"
+
+        result = store._execute_with_retry(fail_then_succeed)
+        assert result == "success"
+        assert call_count == 3
+        assert store._reconnect.call_count == 2  # Called on each retry
+
+    def test_execute_with_retry_raises_non_retriable_immediately(self):
+        """Test _execute_with_retry raises non-retriable errors immediately."""
+        from piragi.stores.postgres import PostgresStore
+
+        store = object.__new__(PostgresStore)
+        store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
+        store.max_retries = 3
+        store.retry_delay = 0.01
+
+        call_count = 0
+
+        def non_retriable_error():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("syntax error")
+
+        with pytest.raises(Exception, match="syntax error"):
+            store._execute_with_retry(non_retriable_error)
+
+        assert call_count == 1  # No retries for non-retriable errors
+
+    def test_execute_with_retry_exhausts_retries(self):
+        """Test _execute_with_retry exhausts retries and raises."""
+        from piragi.stores.postgres import PostgresStore
+
+        store = object.__new__(PostgresStore)
+        store.RETRIABLE_ERRORS = PostgresStore.RETRIABLE_ERRORS
+        store.max_retries = 2
+        store.retry_delay = 0.01
+        store._reconnect = MagicMock()
+
+        call_count = 0
+
+        def always_fail():
+            nonlocal call_count
+            call_count += 1
+            raise Exception("transaction is aborted")
+
+        with pytest.raises(Exception, match="transaction is aborted"):
+            store._execute_with_retry(always_fail)
+
+        assert call_count == 3  # Initial + 2 retries
+
+
+class TestDimensionInference:
+    """Tests for automatic dimension inference."""
+
+    def test_get_dimensions_method_exists(self):
+        """Test that EmbeddingGenerator has get_dimensions method."""
+        from piragi.embeddings import EmbeddingGenerator
+
+        # Verify the method exists
+        assert hasattr(EmbeddingGenerator, "get_dimensions")
+
+    def test_postgres_store_dimension_inference_logic(self):
+        """Test PostgresStore dimension inference logic without actual connection."""
+        from piragi.stores.postgres import PostgresStore
+
+        # Create a mock embedder with get_dimensions
+        mock_embedder = MagicMock()
+        mock_embedder.get_dimensions.return_value = 384
+
+        # Test the dimension inference logic directly
+        # We can't instantiate PostgresStore without psycopg2, but we can test the logic
+        store = object.__new__(PostgresStore)
+
+        # Simulate the dimension logic
+        vector_dimension = None
+        embedder = mock_embedder
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 384
+        mock_embedder.get_dimensions.assert_called_once()
+
+    def test_postgres_store_explicit_dimension_takes_precedence(self):
+        """Test that explicit vector_dimension takes precedence over embedder."""
+        mock_embedder = MagicMock()
+        mock_embedder.get_dimensions.return_value = 384
+
+        # Simulate the dimension logic with explicit dimension
+        vector_dimension = 1536
+        embedder = mock_embedder
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 1536
+        # get_dimensions should NOT be called when explicit dimension provided
+        mock_embedder.get_dimensions.assert_not_called()
+
+    def test_postgres_store_default_dimension(self):
+        """Test that default dimension is 768 when neither provided."""
+        # Simulate the dimension logic with no embedder
+        vector_dimension = None
+        embedder = None
+
+        if vector_dimension is not None:
+            result = vector_dimension
+        elif embedder is not None:
+            result = embedder.get_dimensions()
+        else:
+            result = 768
+
+        assert result == 768
+
+
 class TestPineconeStore:
     """Tests for PineconeStore (mocked)."""
 

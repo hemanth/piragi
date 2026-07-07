@@ -144,3 +144,121 @@ def test_sentence_break_with_initials():
 
     # Should not break after "J." or "K." in "J.K."
     assert "J.K. Rowling" in result or "C.S. Lewis" in result
+
+
+class TestMinChunkLength:
+    """Tests for min_chunk_length filtering."""
+
+    def test_min_chunk_length_default_zero(self):
+        """Test that default min_chunk_length is 0 (no filtering)."""
+        chunker = Chunker(chunk_size=512)
+        assert chunker.min_chunk_length == 0
+
+    def test_min_chunk_length_set(self):
+        """Test that min_chunk_length can be set."""
+        chunker = Chunker(chunk_size=512, min_chunk_length=200)
+        assert chunker.min_chunk_length == 200
+
+    def test_min_chunk_length_filters_short_chunks(self):
+        """Test that chunks shorter than min_chunk_length are filtered out."""
+        chunker = Chunker(chunk_size=100, min_chunk_length=50)
+
+        doc = Document(
+            content="""# Header
+
+Short.
+
+## Section 1
+
+This is a longer section with enough content to pass the minimum chunk length filter that we have set.
+
+## Section 2
+
+Tiny.
+
+## Section 3
+
+Another section with sufficient content that should definitely pass the minimum length requirement we configured.""",
+            source="test.md",
+            metadata={},
+        )
+
+        chunks = chunker.chunk_document(doc)
+
+        # All chunks should be at least min_chunk_length
+        for chunk in chunks:
+            assert len(chunk.text.strip()) >= 50, f"Chunk too short: {repr(chunk.text)}"
+
+    def test_min_chunk_length_reindexes_chunks(self):
+        """Test that chunk indices are re-indexed after filtering."""
+        chunker = Chunker(chunk_size=100, min_chunk_length=30)
+
+        doc = Document(
+            content="""# A
+
+Hi.
+
+## B
+
+This section has enough content to pass the filter easily.
+
+## C
+
+Ok.
+
+## D
+
+Another section with plenty of content to satisfy the minimum.""",
+            source="test.md",
+            metadata={},
+        )
+
+        chunks = chunker.chunk_document(doc)
+
+        # Indices should be sequential starting from 0
+        for i, chunk in enumerate(chunks):
+            assert chunk.chunk_index == i, f"Expected index {i}, got {chunk.chunk_index}"
+
+    def test_min_chunk_length_zero_no_filtering(self):
+        """Test that min_chunk_length=0 doesn't filter anything."""
+        chunker = Chunker(chunk_size=512, min_chunk_length=0)
+
+        doc = Document(
+            content="""# Header
+
+X
+
+## Section
+
+Y""",
+            source="test.md",
+            metadata={},
+        )
+
+        chunks = chunker.chunk_document(doc)
+
+        # Should have chunks for the short sections too
+        assert len(chunks) >= 2
+
+    def test_min_chunk_length_with_whitespace(self):
+        """Test that whitespace is stripped when checking length."""
+        chunker = Chunker(chunk_size=100, min_chunk_length=20)
+
+        doc = Document(
+            content="""# Header
+
+
+
+
+## Real Content
+
+This section has actual meaningful content that passes the filter.""",
+            source="test.md",
+            metadata={},
+        )
+
+        chunks = chunker.chunk_document(doc)
+
+        # Whitespace-only chunks should be filtered
+        for chunk in chunks:
+            assert len(chunk.text.strip()) >= 20

@@ -56,7 +56,49 @@ async def test_async_ragi_init(mock_ragi):
         config=None,
         store=None,
         graph=True,
+        embedder=None,
     )
+
+
+@pytest.mark.asyncio
+async def test_async_ragi_init_with_embedder(mock_ragi):
+    """Test AsyncRagi initialization with custom embedder."""
+    mock_class, mock_instance = mock_ragi
+
+    from piragi.async_ragi import AsyncRagi
+
+    mock_embedder = MagicMock()
+    mock_embedder.model_name = "custom-model"
+
+    kb = AsyncRagi("./docs", embedder=mock_embedder)
+
+    mock_class.assert_called_once_with(
+        sources="./docs",
+        persist_dir=".piragi",
+        config=None,
+        store=None,
+        graph=False,
+        embedder=mock_embedder,
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_ragi_shared_embedder(mock_ragi):
+    """Test that embedder can be shared across multiple AsyncRagi instances."""
+    mock_class, mock_instance = mock_ragi
+
+    from piragi.async_ragi import AsyncRagi
+
+    mock_embedder = MagicMock()
+
+    kb1 = AsyncRagi("./docs1", embedder=mock_embedder)
+    kb2 = AsyncRagi("./docs2", embedder=mock_embedder)
+
+    # Both should have passed the same embedder
+    calls = mock_class.call_args_list
+    assert len(calls) == 2
+    assert calls[0].kwargs.get("embedder") is mock_embedder
+    assert calls[1].kwargs.get("embedder") is mock_embedder
 
 
 @pytest.mark.asyncio

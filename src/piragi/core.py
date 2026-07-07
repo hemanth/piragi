@@ -31,6 +31,12 @@ class Ragi:
         ...     "embedding": {"device": "cuda"}
         ... })
         >>>
+        >>> # Custom embedder (shared across instances)
+        >>> from piragi import EmbeddingGenerator
+        >>> embedder = EmbeddingGenerator(model="custom-model")
+        >>> kb1 = Ragi("./docs1", embedder=embedder)
+        >>> kb2 = Ragi("./docs2", embedder=embedder)
+        >>>
         >>> # Ask questions
         >>> answer = kb.ask("How do I install this?")
         >>> print(answer.text)
@@ -47,6 +53,7 @@ class Ragi:
         store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
         hooks: Optional[Dict[str, Any]] = None,
         graph: bool = False,
+        embedder: Optional[EmbeddingGenerator] = None,
     ) -> None:
         """
         Initialize Ragi with optional document sources.
@@ -70,6 +77,9 @@ class Ragi:
                     - overlap: Overlap in tokens (default: 50)
                     - strategy: Chunking strategy (default: "fixed")
                         Options: "fixed", "semantic", "contextual", "hierarchical"
+                    - min_chunk_length: Minimum chunk length in characters (default: 0)
+                        Chunks shorter than this are filtered out. Useful for removing
+                        garbage chunks like navigation elements, short headers, etc.
                 - retrieval: Retrieval configuration
                     - use_hyde: Enable HyDE (default: False)
                     - use_hybrid_search: Enable BM25 + vector hybrid (default: False)
@@ -98,6 +108,10 @@ class Ragi:
                     Signature: (chunks: List[Chunk]) -> List[Chunk]
             graph: Enable knowledge graph for entity/relationship extraction (default: False)
                 Requires: pip install piragi[graph]
+            embedder: Optional custom EmbeddingGenerator instance. If provided, this
+                embedder will be used instead of creating a new one from config.
+                Useful for sharing a single embedder across multiple Ragi instances
+                to reduce memory usage and loading time.
 
         Examples:
             >>> # Use defaults
@@ -169,20 +183,27 @@ class Ragi:
             self.chunker = Chunker(
                 chunk_size=chunk_cfg.get("size", 512),
                 chunk_overlap=chunk_cfg.get("overlap", 50),
+                min_chunk_length=chunk_cfg.get("min_chunk_length", 0),
             )
 
         self._use_hierarchical = chunk_strategy == "hierarchical"
 
-        # Embeddings
+        # Embeddings - use provided embedder or create new one
         embed_cfg = cfg.get("embedding", {})
         embed_model = embed_cfg.get("model", "all-mpnet-base-v2")
-        self.embedder = EmbeddingGenerator(
-            model=embed_model,
-            device=embed_cfg.get("device"),
-            base_url=embed_cfg.get("base_url"),
-            api_key=embed_cfg.get("api_key"),
-            batch_size=embed_cfg.get("batch_size", 32),
-        )
+        if embedder is not None:
+            self.embedder = embedder
+            # Try to get model name from the provided embedder for store configuration
+            if hasattr(embedder, "model_name"):
+                embed_model = embedder.model_name
+        else:
+            self.embedder = EmbeddingGenerator(
+                model=embed_model,
+                device=embed_cfg.get("device"),
+                base_url=embed_cfg.get("base_url"),
+                api_key=embed_cfg.get("api_key"),
+                batch_size=embed_cfg.get("batch_size", 32),
+            )
 
         # Vector store - supports multiple backends
         self.store = create_store(
