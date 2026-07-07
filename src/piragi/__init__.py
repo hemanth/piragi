@@ -32,6 +32,7 @@ Example:
 
 from .core import Ragi
 from .async_ragi import AsyncRagi
+from .embeddings import EmbeddingGenerator
 from .types import Answer, Citation
 
 # Advanced components (optional imports)
@@ -51,11 +52,12 @@ from .stores import (
     PineconeStore,
 )
 
-__version__ = "0.7.9"
+__version__ = "0.8.0"
 __all__ = [
     # Core
     "Ragi",
     "AsyncRagi",
+    "EmbeddingGenerator",
     "Answer",
     "Citation",
     # Vector stores

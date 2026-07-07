@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-07
+
+### Added
+- Embedder injection API — share a single `EmbeddingGenerator` across multiple `Ragi`/`AsyncRagi` instances to reduce memory (~400MB per instance saved) (PR #16 by @rennf93)
+- PostgreSQL connection resilience with `max_retries` and `retry_delay` parameters, exponential backoff, and auto-reconnect on transient failures (PR #16 by @rennf93)
+- `min_chunk_length` parameter on `Chunker` to filter out garbage/short chunks (navigation, headers, boilerplate) with automatic re-indexing (PR #16 by @rennf93)
+- `get_dimensions()` method on `EmbeddingGenerator` for vector dimension auto-inference (PR #16 by @rennf93)
+- `embedder` parameter on `PostgresStore` for automatic dimension detection without manual specification (PR #16 by @rennf93)
+- `AsyncRagi` documentation section in API.md (PR #16 by @rennf93)
+- `EmbeddingGenerator` exported in package `__all__`
+
 ## [0.7.9] - 2026-02-06
 
 ### Fixed
@@ -148,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata filtering
 - Auto-updates with background workers
 
+[0.8.0]: https://github.com/hemanth/piragi/releases/tag/v0.8.0
+[0.7.9]: https://github.com/hemanth/piragi/releases/tag/v0.7.9
 [0.7.5]: https://github.com/hemanth/piragi/releases/tag/v0.7.5
 [0.7.4]: https://github.com/hemanth/piragi/releases/tag/v0.7.4
 [0.7.3]: https://github.com/hemanth/piragi/releases/tag/v0.7.3
