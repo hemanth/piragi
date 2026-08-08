@@ -54,6 +54,9 @@ def parse_store_uri(uri: str) -> Dict[str, Any]:
             "namespace": query_params.get("namespace", ["default"])[0],
         }
 
+    elif scheme == "qdrant":
+        return {"type": "qdrant", "url": f"http://{parsed.netloc}"}
+
     else:
         # Unknown scheme, treat as local path
         return {"type": "lance", "uri": uri}
@@ -151,6 +154,10 @@ def create_store(
             namespace=config.get("namespace", "default"),
             vector_dimension=vector_dimension or 768,
         )
+
+    elif store_type == "qdrant":
+        from .qdrant import QdrantStore
+        return QdrantStore(**config)
 
     else:
         raise ValueError(f"Unknown store type: {store_type}")

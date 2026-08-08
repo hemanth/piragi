@@ -13,6 +13,7 @@ class EmbeddingGenerator:
         self,
         model: str = "nvidia/llama-embed-nemotron-8b",
         device: str | None = None,
+        backend: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
         batch_size: int = 32
@@ -23,6 +24,7 @@ class EmbeddingGenerator:
         Args:
             model: Embedding model to use (default: nvidia/llama-embed-nemotron-8b)
             device: Device to run on ('cuda', 'cpu', or None for auto-detect) - only for local models
+            backend: Backend to use for inference (e.g., 'onnx'). Requires `pip install piragi[onnx]` or `pip install onnxruntime`.
             base_url: Optional API base URL for remote embeddings (e.g., https://api.openai.com/v1)
             api_key: Optional API key for remote embeddings
         """
@@ -31,6 +33,7 @@ class EmbeddingGenerator:
         self.api_key = api_key
         self.use_remote = base_url is not None
         self.batch_size = batch_size
+        self.backend = backend
                     
         if self.use_remote:
             # Use OpenAI-compatible API client
@@ -45,10 +48,16 @@ class EmbeddingGenerator:
             # Use local sentence-transformers
             from sentence_transformers import SentenceTransformer
 
+            kwargs = {
+                "trust_remote_code": True,
+                "device": device,
+            }
+            if self.backend is not None:
+                kwargs["backend"] = self.backend
+
             self.model = SentenceTransformer(
                 model,
-                trust_remote_code=True,
-                device=device,
+                **kwargs
             )
             self.client = None
 

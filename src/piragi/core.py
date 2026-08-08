@@ -200,6 +200,7 @@ class Ragi:
             self.embedder = EmbeddingGenerator(
                 model=embed_model,
                 device=embed_cfg.get("device"),
+                backend=embed_cfg.get("backend"),
                 base_url=embed_cfg.get("base_url"),
                 api_key=embed_cfg.get("api_key"),
                 batch_size=embed_cfg.get("batch_size", 32),

@@ -29,6 +29,10 @@ try:
     from .supabase import SupabaseStore
 except ImportError:
     SupabaseStore = None  # Optional dependency
+try:
+    from .qdrant import QdrantStore
+except ImportError:
+    QdrantStore = None
 from .factory import create_store, parse_store_uri
 
 __all__ = [
@@ -37,6 +41,7 @@ __all__ = [
     "PostgresStore",
     "PineconeStore",
     "SupabaseStore",
+    "QdrantStore",
     "create_store",
     "parse_store_uri",
 ]

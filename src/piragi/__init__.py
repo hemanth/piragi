@@ -50,6 +50,7 @@ from .stores import (
     LanceStore,
     PostgresStore,
     PineconeStore,
+    QdrantStore,
 )
 
 __version__ = "0.8.0"
@@ -65,6 +66,7 @@ __all__ = [
     "LanceStore",
     "PostgresStore",
     "PineconeStore",
+    "QdrantStore",
     # Reranking
     "CrossEncoderReranker",
     "TFIDFReranker",
