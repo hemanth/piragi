@@ -79,6 +79,10 @@ Documentation = "https://github.com/hemanth/piragi#readme"
 Repository = "https://github.com/hemanth/piragi"
 Issues = "https://github.com/hemanth/piragi/issues"
 
+[project.scripts]
+piragi = "piragi.cli:main"
+
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/piragi"]
 

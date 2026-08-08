@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>piragi Playground</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Prism.js CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-color: #0d0f12;
+            --text-main: #f0f4f8;
+            --text-muted: #8b949e;
+            --accent: #00d2ff;
+            --accent-alt: #3a7bd5;
+            --card-bg: rgba(20, 24, 30, 0.6);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --button-bg: rgba(255, 255, 255, 0.1);
+            --button-hover: rgba(255, 255, 255, 0.15);
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(58, 123, 213, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(0, 210, 255, 0.15) 0%, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.03em;
+        }
+
+        .tagline {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .badges {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: var(--button-bg);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-family: var(--font-mono);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: var(--text-main);
+            transition: all 0.2s ease;
+        }
+
+        .badge:hover {
+            background: var(--button-hover);
+            transform: translateY(-2px);
+        }
+
+        .cell-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .cell {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+        
+        .cell:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+
+        .cell-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .cell-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .run-btn {
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(0, 210, 255, 0.3);
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            font-family: var(--font-sans);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .run-btn:hover {
+            background: rgba(0, 210, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+        }
+        
+        .run-btn:active {
+            transform: scale(0.96);
+        }
+
+        .run-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        .editor-wrapper {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1d1f21; /* Match prism tomorrow background */
+        }
+
+        /* Sync text formatting for textarea and pre */
+        .code-textarea, .code-display {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 1rem;
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            margin: 0;
+            white-space: pre;
+            word-wrap: normal;
+            overflow-x: auto;
+            tab-size: 4;
+        }
+
+        .code-textarea {
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: transparent;
+            background: transparent;
+            caret-color: var(--text-main);
+            z-index: 2;
+            resize: none;
+            overflow: hidden; /* handled by auto-resize JS */
+        }
+
+        .code-display {
+            position: relative;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        /* Prism overrides */
+        pre[class*="language-"] {
+            margin: 0 !important;
+            padding: 1rem !important;
+            background: transparent !important;
+            text-shadow: none !important;
+            border-radius: 0 !important;
+        }
+        
+        code[class*="language-"] {
+            font-family: var(--font-mono) !important;
+            font-size: 14px !important;
+            line-height: 1.5 !important;
+            text-shadow: none !important;
+        }
+
+        .output-wrapper {
+            margin-top: 1rem;
+            background: #000;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: #a5d6ff;
+            display: none; /* hidden initially */
+            white-space: pre-wrap;
+            position: relative;
+        }
+        
+        .output-wrapper.visible {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+        
+        .typing-cursor::after {
+            content: '▋';
+            animation: blink 1s step-start infinite;
+            color: #a5d6ff;
+        }
+
+        footer {
+            margin-top: 5rem;
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid var(--card-border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin: 0 0.5rem;
+            transition: color 0.2s;
+        }
+        
+        footer a:hover {
+            color: var(--text-main);
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Stagger cell animations */
+        .cell:nth-child(1) { animation-delay: 0.1s; }
+        .cell:nth-child(2) { animation-delay: 0.2s; }
+        .cell:nth-child(3) { animation-delay: 0.3s; }
+        .cell:nth-child(4) { animation-delay: 0.4s; }
+        .cell:nth-child(5) { animation-delay: 0.5s; }
+        .cell:nth-child(6) { animation-delay: 0.6s; }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.5rem; }
+            .container { padding: 2rem 1rem; }
+            .badges { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>piragi</h1>
+        <p class="tagline">zero-config RAG — try it interactively</p>
+        <div class="badges">
+            <div class="badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                pip install piragi
+            </div>
+            <a href="https://github.com/hemanth/piragi" class="badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                GitHub
+            </a>
+        </div>
+    </header>
+
+    <div class="cell-container">
+        
+        <!-- Cell 1: Setup -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">1. Setup</span>
+                <button class="run-btn" onclick="runCell(0)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(0)">pip install piragi</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-bash" id="code-0">pip install piragi</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-0"></div>
+        </div>
+
+        <!-- Cell 2: Basic RAG -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">2. Basic RAG</span>
+                <button class="run-btn" onclick="runCell(1)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(1)">from piragi import Ragi
+
+kb = Ragi("./docs")
+answer = kb.ask("How do I deploy?")
+print(answer.text)
+print(f"Citations: {len(answer.citations)}")</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-python" id="code-1">from piragi import Ragi
+
+kb = Ragi("./docs")
+answer = kb.ask("How do I deploy?")
+print(answer.text)
+print(f"Citations: {len(answer.citations)}")</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-1"></div>
+        </div>
+
+        <!-- Cell 3: ONNX Speedup -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">3. ONNX Speedup</span>
+                <button class="run-btn" onclick="runCell(2)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(2)">from piragi import Ragi
+
+kb = Ragi("./docs", config={"embedding": {"backend": "onnx"}})
+# 2-5x faster on CPU</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-python" id="code-2">from piragi import Ragi
+
+kb = Ragi("./docs", config={"embedding": {"backend": "onnx"}})
+# 2-5x faster on CPU</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-2"></div>
+        </div>
+
+        <!-- Cell 4: Shared Embedder -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">4. Shared Embedder</span>
+                <button class="run-btn" onclick="runCell(3)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(3)">from piragi import Ragi, EmbeddingGenerator
+
+embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+kb_docs = Ragi("./docs", embedder=embedder)
+kb_code = Ragi("./src", embedder=embedder)
+# One model, multiple knowledge bases</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-python" id="code-3">from piragi import Ragi, EmbeddingGenerator
+
+embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
+kb_docs = Ragi("./docs", embedder=embedder)
+kb_code = Ragi("./src", embedder=embedder)
+# One model, multiple knowledge bases</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-3"></div>
+        </div>
+
+        <!-- Cell 5: Qdrant + TurboQuant -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">5. Qdrant + TurboQuant</span>
+                <button class="run-btn" onclick="runCell(4)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(4)">from piragi.stores import QdrantStore
+
+store = QdrantStore(
+    url="http://localhost:6333",
+    quantization="turboquant",
+)
+kb = Ragi("./docs", store=store)</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-python" id="code-4">from piragi.stores import QdrantStore
+
+store = QdrantStore(
+    url="http://localhost:6333",
+    quantization="turboquant",
+)
+kb = Ragi("./docs", store=store)</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-4"></div>
+        </div>
+
+        <!-- Cell 6: Async -->
+        <div class="cell">
+            <div class="cell-header">
+                <span class="cell-title">6. Async</span>
+                <button class="run-btn" onclick="runCell(5)">
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
+                </button>
+            </div>
+            <div class="editor-wrapper">
+                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(5)">from piragi import AsyncRagi
+
+async_kb = AsyncRagi("./docs")
+answer = await async_kb.ask("What's the API?")</textarea>
+                <div class="code-display" aria-hidden="true">
+                    <pre><code class="language-python" id="code-5">from piragi import AsyncRagi
+
+async_kb = AsyncRagi("./docs")
+answer = await async_kb.ask("What's the API?")</code></pre>
+                </div>
+            </div>
+            <div class="output-wrapper" id="out-5"></div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>Made by <a href="https://github.com/hemanth">@hemanth</a> &bull; 
+        <a href="https://github.com/hemanth/piragi">Docs</a> &bull; 
+        <a href="https://pypi.org/project/piragi/">PyPI</a></p>
+    </footer>
+</div>
+
+<!-- Prism.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+
+<script>
+    // Outputs for simulation
+    const simulatedOutputs = [
+        `Collecting piragi
+Downloading piragi-0.1.0-py3-none-any.whl (42 kB)
+Installing collected packages: piragi
+Successfully installed piragi-0.1.0`,
+
+        `To deploy piragi, you can build a Docker container with your docs and run the server module. Ensure you have the OPENAI_API_KEY exported in your environment. For production, consider using Qdrant or Milvus instead of the default local store.
+Citations: 2`,
+
+        `[INFO] Loading ONNX runtime...
+[INFO] Embedding generation: 14.2ms (was 48.5ms with PyTorch)
+[INFO] Speedup: ~3.4x faster`,
+
+        `[INFO] Initializing shared embedding model all-mpnet-base-v2
+[INFO] Processing ./docs (152 chunks)... done.
+[INFO] Processing ./src (480 chunks)... done.
+[INFO] Total memory saved: ~1.2GB`,
+
+        `[INFO] Connecting to Qdrant at http://localhost:6333
+[INFO] Initializing collection with TurboQuant (int8)...
+[INFO] Storage optimized. Index size reduced by 75%.`,
+
+        `[INFO] Running async event loop...
+The API provides both synchronous (Ragi) and asynchronous (AsyncRagi) interfaces. You can use the standard await syntax for non-blocking embedding and LLM calls in FastAPI or Starlette apps.`
+    ];
+
+    // Setup Textareas
+    document.querySelectorAll('.code-textarea').forEach((textarea, i) => {
+        // Sync scroll
+        const pre = document.querySelector(`#code-${i}`).parentElement;
+        textarea.addEventListener('scroll', () => {
+            pre.scrollTop = textarea.scrollTop;
+            pre.scrollLeft = textarea.scrollLeft;
+        });
+
+        // Initial sizing
+        const adjustHeight = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+        };
+        textarea.addEventListener('input', adjustHeight);
+        
+        // Let fonts load then adjust
+        setTimeout(adjustHeight, 100);
+        window.addEventListener('resize', adjustHeight);
+        
+        // Handle Tab key
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key == 'Tab') {
+                e.preventDefault();
+                var start = this.selectionStart;
+                var end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+                updateCode(i);
+            }
+        });
+    });
+
+    function updateCode(index) {
+        const textarea = document.querySelectorAll('.code-textarea')[index];
+        const codeBlock = document.getElementById(`code-${index}`);
+        
+        codeBlock.textContent = textarea.value;
+        Prism.highlightElement(codeBlock);
+        
+        // Adjust height
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    function runCell(index) {
+        const btn = document.querySelectorAll('.run-btn')[index];
+        const output = document.getElementById(`out-${index}`);
+        
+        // Disable button during run
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        
+        output.classList.add('visible');
+        output.innerHTML = '<span class="typing-cursor"></span>';
+        
+        const fullText = simulatedOutputs[index];
+        let currentText = '';
+        let charIndex = 0;
+        
+        const typeChar = () => {
+            if (charIndex < fullText.length) {
+                // Type faster for setup cell
+                const charsToType = index === 0 ? 5 : (Math.random() < 0.2 ? 3 : 1);
+                
+                currentText += fullText.substring(charIndex, charIndex + charsToType);
+                charIndex += charsToType;
+                
+                // Escape HTML for safety but keep line breaks
+                const safeText = currentText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                output.innerHTML = safeText + '<span class="typing-cursor"></span>';
+                
+                setTimeout(typeChar, index === 0 ? 10 : 20 + Math.random() * 30);
+            } else {
+                output.innerHTML = currentText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        };
+        
+        // Small delay before starting to simulate network/processing
+        setTimeout(typeChar, 300);
+    }
+</script>
+
+</body>
+</html>
