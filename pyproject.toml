@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "piragi"
-version = "1.0.0"
+version = "1.1.0"
 description = "The best RAG interface yet - Built-in vector store, embeddings, citations, and auto-updates"
 readme = "README.md"
 requires-python = ">=3.10"

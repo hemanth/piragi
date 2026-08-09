@@ -5,8 +5,10 @@ import os
 from typing import List, Optional
 
 from openai import OpenAI
+import openai
 
 from .types import Answer, Citation
+from .retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -71,15 +73,18 @@ class Retriever:
 Generate 2 alternative phrasings that preserve the same meaning but use different words.
 Return only the alternatives, one per line, without numbering or explanation."""
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that rephrases questions."},
-                    {"role": "user", "content": expansion_prompt},
-                ],
-                temperature=0.7,
-                max_tokens=100,
-            )
+            @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
+            def do_request():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that rephrases questions."},
+                        {"role": "user", "content": expansion_prompt},
+                    ],
+                    temperature=0.7,
+                    max_tokens=100,
+                )
+            response = do_request()
 
             alternatives = response.choices[0].message.content or ""
             variations = [query] + [line.strip() for line in alternatives.split('\n') if line.strip()]
@@ -197,14 +202,17 @@ Question: {query}
 Please answer the question based on the context provided above. Cite your sources."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=self.temperature,
-            )
+            @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
+            def do_request():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=self.temperature,
+                )
+            response = do_request()
 
             return response.choices[0].message.content or ""
 

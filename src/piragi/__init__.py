@@ -34,6 +34,7 @@ from .core import Ragi
 from .async_ragi import AsyncRagi
 from .embeddings import EmbeddingGenerator
 from .types import Answer, Citation
+from .config import RagiConfig
 
 # Advanced components (optional imports)
 from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
@@ -53,7 +54,7 @@ from .stores import (
     QdrantStore,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     # Core
     "Ragi",
@@ -61,6 +62,7 @@ __all__ = [
     "EmbeddingGenerator",
     "Answer",
     "Citation",
+    "RagiConfig",
     # Vector stores
     "VectorStoreProtocol",
     "LanceStore",

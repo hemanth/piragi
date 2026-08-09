@@ -145,6 +145,14 @@ class Ragi:
             ... })
         """
         # Initialize config
+        from .config import RagiConfig
+        if isinstance(config, RagiConfig):
+            self.config = config
+        elif isinstance(config, dict):
+            self.config = RagiConfig(**config)
+        else:
+            self.config = RagiConfig()
+
         cfg = config or {}
 
         # Store config for later use
@@ -154,43 +162,40 @@ class Ragi:
         self.loader = DocumentLoader()
 
         # Chunking configuration
-        chunk_cfg = cfg.get("chunk", {})
-        chunk_strategy = chunk_cfg.get("strategy", "fixed")
+        chunk_strategy = self.config.chunk.strategy
 
         if chunk_strategy == "semantic":
             from .semantic_chunking import SemanticChunker
             self.chunker = SemanticChunker(
-                similarity_threshold=chunk_cfg.get("similarity_threshold", 0.5),
-                min_chunk_size=chunk_cfg.get("min_size", 100),
-                max_chunk_size=chunk_cfg.get("max_size", 2000),
+                similarity_threshold=self.config.chunk.similarity_threshold,
+                min_chunk_size=self.config.chunk.min_size,
+                max_chunk_size=self.config.chunk.max_size,
             )
         elif chunk_strategy == "contextual":
             from .semantic_chunking import ContextualChunker
-            llm_cfg = cfg.get("llm", {})
             self.chunker = ContextualChunker(
-                model=llm_cfg.get("model", "llama3.2"),
-                api_key=llm_cfg.get("api_key"),
-                base_url=llm_cfg.get("base_url"),
+                model=self.config.llm.model,
+                api_key=self.config.llm.api_key,
+                base_url=self.config.llm.base_url,
             )
         elif chunk_strategy == "hierarchical":
             from .semantic_chunking import HierarchicalChunker
             self.chunker = HierarchicalChunker(
-                parent_chunk_size=chunk_cfg.get("parent_size", 2000),
-                child_chunk_size=chunk_cfg.get("child_size", 400),
+                parent_chunk_size=self.config.chunk.parent_size,
+                child_chunk_size=self.config.chunk.child_size,
             )
             self._use_hierarchical = True
         else:
             self.chunker = Chunker(
-                chunk_size=chunk_cfg.get("size", 512),
-                chunk_overlap=chunk_cfg.get("overlap", 50),
-                min_chunk_length=chunk_cfg.get("min_chunk_length", 0),
+                chunk_size=self.config.chunk.size,
+                chunk_overlap=self.config.chunk.overlap,
+                min_chunk_length=self.config.chunk.min_chunk_length,
             )
 
         self._use_hierarchical = chunk_strategy == "hierarchical"
 
         # Embeddings - use provided embedder or create new one
-        embed_cfg = cfg.get("embedding", {})
-        embed_model = embed_cfg.get("model", "all-mpnet-base-v2")
+        embed_model = self.config.embedding.model
         if embedder is not None:
             self.embedder = embedder
             # Try to get model name from the provided embedder for store configuration
@@ -199,11 +204,11 @@ class Ragi:
         else:
             self.embedder = EmbeddingGenerator(
                 model=embed_model,
-                device=embed_cfg.get("device"),
-                backend=embed_cfg.get("backend"),
-                base_url=embed_cfg.get("base_url"),
-                api_key=embed_cfg.get("api_key"),
-                batch_size=embed_cfg.get("batch_size", 32),
+                device=self.config.embedding.device,
+                backend=self.config.embedding.backend,
+                base_url=self.config.embedding.base_url,
+                api_key=self.config.embedding.api_key,
+                batch_size=self.config.embedding.batch_size,
             )
 
         # Vector store - supports multiple backends
@@ -214,53 +219,47 @@ class Ragi:
         )
 
         # Retrieval configuration
-        retrieval_cfg = cfg.get("retrieval", {})
-        self._use_hyde = retrieval_cfg.get("use_hyde", False)
-        self._use_hybrid_search = retrieval_cfg.get("use_hybrid_search", False)
-        self._use_cross_encoder = retrieval_cfg.get("use_cross_encoder", False)
+        self._use_hyde = self.config.retrieval.use_hyde
+        self._use_hybrid_search = self.config.retrieval.use_hybrid_search
+        self._use_cross_encoder = self.config.retrieval.use_cross_encoder
 
         # Initialize advanced retrieval components
         self._hyde = None
         self._hybrid_searcher = None
         self._cross_encoder = None
 
-        llm_cfg = cfg.get("llm", {})
-
         if self._use_hyde:
             from .query_transform import HyDE
             self._hyde = HyDE(
-                model=llm_cfg.get("model", "llama3.2"),
-                api_key=llm_cfg.get("api_key"),
-                base_url=llm_cfg.get("base_url"),
+                model=self.config.llm.model,
+                api_key=self.config.llm.api_key,
+                base_url=self.config.llm.base_url,
             )
 
         if self._use_hybrid_search:
             from .hybrid_search import HybridSearcher
             self._hybrid_searcher = HybridSearcher(
-                vector_weight=retrieval_cfg.get("vector_weight", 0.5),
-                bm25_weight=retrieval_cfg.get("bm25_weight", 0.5),
-                use_rrf=retrieval_cfg.get("use_rrf", True),
+                vector_weight=self.config.retrieval.vector_weight,
+                bm25_weight=self.config.retrieval.bm25_weight,
+                use_rrf=self.config.retrieval.use_rrf,
             )
 
         if self._use_cross_encoder:
             from .reranker import CrossEncoderReranker
             self._cross_encoder = CrossEncoderReranker(
-                model_name=retrieval_cfg.get(
-                    "cross_encoder_model",
-                    "cross-encoder/ms-marco-MiniLM-L-6-v2"
-                ),
-                device=retrieval_cfg.get("cross_encoder_device", embed_cfg.get("device")),
-                trust_remote_code=retrieval_cfg.get("trust_remote_code", False),
+                model_name=self.config.retrieval.cross_encoder_model,
+                device=self.config.retrieval.cross_encoder_device or self.config.embedding.device,
+                trust_remote_code=self.config.retrieval.trust_remote_code,
             )
 
         # LLM / Basic retriever
         self.retriever = Retriever(
-            model=llm_cfg.get("model", "llama3.2"),
-            api_key=llm_cfg.get("api_key"),
-            base_url=llm_cfg.get("base_url"),
-            temperature=llm_cfg.get("temperature", 0.1),
-            enable_reranking=llm_cfg.get("enable_reranking", True) and not self._use_cross_encoder,
-            enable_query_expansion=llm_cfg.get("enable_query_expansion", True) and not self._use_hyde,
+            model=self.config.llm.model,
+            api_key=self.config.llm.api_key,
+            base_url=self.config.llm.base_url,
+            temperature=self.config.llm.temperature,
+            enable_reranking=self.config.llm.enable_reranking and not self._use_cross_encoder,
+            enable_query_expansion=self.config.llm.enable_query_expansion and not self._use_hyde,
         )
 
         # State for filtering
@@ -273,14 +272,13 @@ class Ragi:
         self._post_embed_hook: Optional[ChunkHook] = hooks_cfg.get("post_embed")
 
         # Auto-update setup
-        auto_update_cfg = cfg.get("auto_update", {})
-        self._auto_update_enabled = auto_update_cfg.get("enabled", True)
+        self._auto_update_enabled = self.config.auto_update.enabled
         self._updater: Optional[AsyncUpdater] = None
         self._tracked_sources: Dict[str, Document] = {}
 
         if self._auto_update_enabled:
-            interval = auto_update_cfg.get("interval", 300.0)
-            workers = auto_update_cfg.get("workers", 2)
+            interval = self.config.auto_update.interval
+            workers = self.config.auto_update.workers
 
             self._updater = AsyncUpdater(
                 refresh_callback=self._background_refresh,
@@ -323,7 +321,7 @@ class Ragi:
             if on_progress:
                 on_progress(msg)
             else:
-                print("[piragi]", msg)
+                logger.info(msg)
 
         # Load documents
         _progress("Discovering files...")
@@ -372,12 +370,11 @@ class Ragi:
         # Extract entities and relationships for knowledge graph
         if self._use_graph and self._graph:
             _progress("Extracting knowledge graph...")
-            llm_cfg = self._config.get("llm", {})
             for chunk in chunks_with_embeddings:
                 self._graph.extract_and_add(
                     text=chunk.text,
                     llm_client=self.retriever.client,
-                    model=llm_cfg.get("model", "llama3.2"),
+                    model=self.config.llm.model,
                 )
             self._graph.save()
 
@@ -431,6 +428,16 @@ class Ragi:
         Returns:
             Answer with citations
         """
+        return self._ask_with_filters(query, top_k, system_prompt, None)
+
+    def _ask_with_filters(
+        self,
+        query: str,
+        top_k: int = 5,
+        system_prompt: Optional[str] = None,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> Answer:
+        """Internal implementation of ask with explicit filters."""
         # Validate query
         if not query or not query.strip():
             return Answer(
@@ -468,7 +475,7 @@ class Ragi:
             citations = self.store.search(
                 query_embedding=query_embedding,
                 top_k=search_top_k,
-                filters=self._filters,
+                filters=filters,
             )
 
             # Add unique citations
@@ -534,9 +541,6 @@ class Ragi:
             system_prompt=final_system_prompt,
         )
 
-        # Reset filters after use
-        self._filters = None
-
         return answer
 
     def retrieve(
@@ -566,6 +570,15 @@ class Ragi:
             >>> context = "\\n".join(c.chunk for c in chunks)
             >>> response = your_llm(f"Based on: {context}\\n\\nQ: {query}")
         """
+        return self._retrieve_with_filters(query, top_k, None)
+
+    def _retrieve_with_filters(
+        self,
+        query: str,
+        top_k: int = 5,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[Citation]:
+        """Internal implementation of retrieve with explicit filters."""
         from .types import Citation
 
         # Validate query
@@ -600,7 +613,7 @@ class Ragi:
             citations = self.store.search(
                 query_embedding=query_embedding,
                 top_k=search_top_k,
-                filters=self._filters,
+                filters=filters,
             )
 
             # Add unique citations
@@ -640,9 +653,6 @@ class Ragi:
         # For hierarchical chunks, expand to parent context
         if self._use_hierarchical:
             all_citations = self._expand_to_parent_context(all_citations)
-
-        # Reset filters after use
-        self._filters = None
 
         return all_citations
 
@@ -690,7 +700,7 @@ class Ragi:
             >>> kb.filter(source="docs/guide.pdf").ask("What's in the guide?")
         """
         self._filters = kwargs
-        return self
+        return FilteredRagi(self, kwargs)
 
     def __call__(self, query: str, top_k: int = 5) -> Answer:
         """
@@ -781,3 +791,23 @@ class Ragi:
         """Cleanup on deletion."""
         if hasattr(self, "_updater") and self._updater:
             self._updater.stop()
+
+class FilteredRagi:
+    """A wrapper for Ragi that binds specific metadata filters."""
+
+    def __init__(self, ragi: Ragi, filters: Dict[str, Any]):
+        self._ragi = ragi
+        self._filters = filters
+
+    def ask(self, query: str, top_k: int = 5, system_prompt: Optional[str] = None) -> Answer:
+        return self._ragi._ask_with_filters(query, top_k, system_prompt, self._filters)
+
+    def retrieve(self, query: str, top_k: int = 5) -> List[Citation]:
+        return self._ragi._retrieve_with_filters(query, top_k, self._filters)
+
+    def filter(self, **kwargs: Any) -> "FilteredRagi":
+        new_filters = {**self._filters, **kwargs}
+        return FilteredRagi(self._ragi, new_filters)
+
+    def __call__(self, query: str, top_k: int = 5) -> Answer:
+        return self.ask(query, top_k=top_k)

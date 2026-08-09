@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from piragi import Ragi
+from piragi.core import FilteredRagi
 from piragi.types import Answer, Citation
 
 
@@ -165,13 +166,14 @@ class TestRagiQuery:
 class TestRagiFilter:
     """Tests for metadata filtering."""
 
-    def test_filter_returns_self(self, temp_dir):
-        """Test that filter() returns self for chaining."""
+    def test_filter_returns_filtered_ragi(self, temp_dir):
+        """Test that filter() returns FilteredRagi for chaining."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
         kb = Ragi(persist_dir=persist_dir)
         result = kb.filter(type="test")
 
-        assert result is kb
+        assert isinstance(result, FilteredRagi)
+        assert result is not kb
 
     @patch("piragi.retrieval.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")

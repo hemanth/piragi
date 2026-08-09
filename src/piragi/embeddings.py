@@ -8,12 +8,15 @@ from typing import Callable, List, Optional
 from .types import Chunk
 
 from collections import OrderedDict
+import threading
+from .retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
 # Module-level cache for SentenceTransformer models (keyed by model+backend)
 _MODEL_CACHE_MAX = 3
 _model_cache = OrderedDict()
+_cache_lock = threading.Lock()
 
 class EmbeddingGenerator:
     """Generate embeddings using local sentence-transformers or remote API."""
@@ -56,9 +59,14 @@ class EmbeddingGenerator:
         else:
             # Use local sentence-transformers (with cache)
             cache_key = (model, backend)
-            if cache_key in _model_cache:
-                _model_cache.move_to_end(cache_key)
-                self.model = _model_cache[cache_key]
+            
+            with _cache_lock:
+                in_cache = cache_key in _model_cache
+                if in_cache:
+                    _model_cache.move_to_end(cache_key)
+                    self.model = _model_cache[cache_key]
+
+            if in_cache:
                 print("[piragi] model '{}' loaded from cache".format(model))
             else:
                 from sentence_transformers import SentenceTransformer
@@ -76,11 +84,14 @@ class EmbeddingGenerator:
                     model,
                     **kwargs
                 )
-                _model_cache[cache_key] = self.model
-                if len(_model_cache) > _MODEL_CACHE_MAX:
-                    evicted_key, evicted_model = _model_cache.popitem(last=False)
-                    del evicted_model  # free memory
-                    logger.info("Evicted model '%s' from cache (max %d)", evicted_key[0], _MODEL_CACHE_MAX)
+                
+                with _cache_lock:
+                    _model_cache[cache_key] = self.model
+                    if len(_model_cache) > _MODEL_CACHE_MAX:
+                        evicted_key, evicted_model = _model_cache.popitem(last=False)
+                        del evicted_model  # free memory
+                        logger.info("Evicted model '%s' from cache (max %d)", evicted_key[0], _MODEL_CACHE_MAX)
+                        
                 print("[piragi] model loaded in {:.1f}s".format(time.time() - t0))
             self.client = None
 
@@ -141,10 +152,15 @@ class EmbeddingGenerator:
         try:
             if self.use_remote:
                 # Use OpenAI-compatible API
-                response = self.client.embeddings.create(
-                    input=texts,
-                    model=self.model_name,
-                )
+                import openai
+                
+                @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
+                def do_request():
+                    return self.client.embeddings.create(
+                        input=texts,
+                        model=self.model_name,
+                    )
+                response = do_request()
                 return [item.embedding for item in response.data]
             else:
                 # Use local sentence-transformers
@@ -191,14 +207,18 @@ class EmbeddingGenerator:
         try:
             if self.use_remote:
                 # Use OpenAI-compatible API
+                import openai
                 query_text = query
                 if task_instruction:
                     query_text = f"{task_instruction}\n{query}"
 
-                response = self.client.embeddings.create(
-                    input=query_text,
-                    model=self.model_name,
-                )
+                @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
+                def do_request():
+                    return self.client.embeddings.create(
+                        input=query_text,
+                        model=self.model_name,
+                    )
+                response = do_request()
                 return response.data[0].embedding
             else:
                 # Use local sentence-transformers
