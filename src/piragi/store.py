@@ -1,8 +1,11 @@
 """Vector store using LanceDB."""
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 import lancedb
 import pyarrow as pa
@@ -44,8 +47,16 @@ def get_embedding_dimension(model_name: str) -> int:
         if key in model_name or model_name.endswith(key):
             return dim
 
-    # Default to 768 (common dimension)
-    return 768
+    # Auto-detect using EmbeddingGenerator
+    try:
+        from piragi.embeddings import EmbeddingGenerator
+        gen = EmbeddingGenerator(model=model_name)
+        dim = len(gen.embed_query("dimension probe"))
+        EMBEDDING_DIMENSIONS[model_name] = dim  # cache for next time
+        logger.info("Auto-detected %d dimensions for model %s", dim, model_name)
+        return dim
+    except Exception:
+        return 384  # safe default
 
 
 class VectorStore:

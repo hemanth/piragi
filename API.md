@@ -228,7 +228,7 @@ from piragi import EmbeddingGenerator
 from piragi.stores import PostgresStore
 
 # Create embedder first
-embedder = EmbeddingGenerator(model="all-MiniLM-L6-v2")
+embedder = EmbeddingGenerator(model="BAAI/bge-small-en-v1.5")
 
 # Auto-infer dimensions from embedder (384 for MiniLM)
 store = PostgresStore(

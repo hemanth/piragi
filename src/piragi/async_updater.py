@@ -53,6 +53,7 @@ class AsyncUpdater:
         # Update queue and control
         self.update_queue: Queue = Queue()
         self.running = False
+        self._stop_event = threading.Event()
         self.workers: List[threading.Thread] = []
         self._lock = threading.RLock()
 
@@ -128,6 +129,7 @@ class AsyncUpdater:
     def stop(self) -> None:
         """Stop background workers."""
         self.running = False
+        self._stop_event.set()
         logger.info("Stopping async updater...")
 
         # Wait for workers to finish current tasks
@@ -164,11 +166,11 @@ class AsyncUpdater:
                 self.stats["last_check_time"] = current_time
 
                 # Sleep until next scheduled check (check every 10s for any due sources)
-                time.sleep(10)
+                self._stop_event.wait(timeout=10)
 
             except Exception as e:
                 logger.error(f"Scheduler error: {e}")
-                time.sleep(10)
+                self._stop_event.wait(timeout=10)
 
     def _worker_loop(self) -> None:
         """

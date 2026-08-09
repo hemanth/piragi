@@ -3,6 +3,17 @@
 import json
 import os
 from typing import Any, Dict, List, Optional, Tuple
+from difflib import SequenceMatcher
+
+def _fuzzy_match(query, target, threshold=0.6):
+    """Check if query fuzzy-matches target."""
+    q = query.lower().strip()
+    t = target.lower().strip()
+    # Exact substring
+    if q in t or t in q:
+        return True
+    # Fuzzy ratio
+    return SequenceMatcher(None, q, t).ratio() >= threshold
 
 # Lazy import networkx
 _nx = None
@@ -93,11 +104,14 @@ Return ONLY the JSON array, no other text."""
             triples = json.loads(content)
 
             # Add to graph
+            normalized = []
             for triple in triples:
                 if len(triple) == 3:
-                    self.add_triple(triple[0], triple[1], triple[2])
+                    s, p, o = triple[0].title(), triple[1], triple[2].title()
+                    self.add_triple(s, p, o)
+                    normalized.append((s, p, o))
 
-            return [(t[0], t[1], t[2]) for t in triples if len(t) == 3]
+            return normalized
 
         except Exception:
             # Silently fail extraction - don't break ingestion
@@ -105,8 +119,8 @@ Return ONLY the JSON array, no other text."""
 
     def add_triple(self, subject: str, predicate: str, obj: str) -> None:
         """Add a (subject, predicate, object) triple to the graph."""
-        subject = subject.strip().lower()
-        obj = obj.strip().lower()
+        subject = subject.strip().title()
+        obj = obj.strip().title()
         predicate = predicate.strip().lower()
 
         self._graph.add_edge(subject, obj, relation=predicate)
@@ -114,7 +128,7 @@ Return ONLY the JSON array, no other text."""
 
     def neighbors(self, entity: str) -> List[str]:
         """Get all entities connected to the given entity."""
-        entity = entity.strip().lower()
+        entity = entity.strip().title()
         if entity not in self._graph:
             return []
 
@@ -125,7 +139,7 @@ Return ONLY the JSON array, no other text."""
 
     def get_relations(self, entity: str) -> List[Tuple[str, str, str]]:
         """Get all triples involving the given entity."""
-        entity = entity.strip().lower()
+        entity = entity.strip().title()
         results = []
 
         for s, p, o in self._triples:
@@ -148,11 +162,10 @@ Return ONLY the JSON array, no other text."""
 
         Simple substring matching on entities and predicates.
         """
-        query = query.strip().lower()
         results = []
 
         for s, p, o in self._triples:
-            if query in s or query in p or query in o:
+            if _fuzzy_match(query, s) or _fuzzy_match(query, p) or _fuzzy_match(query, o):
                 results.append((s, p, o))
 
         return results

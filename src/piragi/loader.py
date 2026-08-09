@@ -2,6 +2,7 @@
 
 import asyncio
 import glob
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -11,6 +12,8 @@ from urllib.parse import urlparse, urljoin
 from markitdown import MarkItDown
 
 from .types import Document
+
+logger = logging.getLogger(__name__)
 
 # Remote filesystem schemes supported via fsspec
 REMOTE_SCHEMES = {"s3", "gs", "gcs", "az", "abfs", "abfss", "hdfs", "webhdfs", "sftp", "ftp"}
@@ -58,6 +61,7 @@ class DocumentLoader:
     def __init__(self) -> None:
         """Initialize the document loader."""
         self.converter = MarkItDown()
+        self.failed_count = 0
 
     def load(self, source: Union[str, List[str]]) -> List[Document]:
         """
@@ -75,8 +79,12 @@ class DocumentLoader:
             sources = source
 
         documents = []
+        self.failed_count = 0
         for src in sources:
             documents.extend(self._load_single(src))
+
+        if self.failed_count > 0:
+            logger.warning("%d file(s) failed to load", self.failed_count)
 
         return documents
 
@@ -190,8 +198,9 @@ class DocumentLoader:
         for f in files:
             try:
                 documents.append(self._load_file(f))
-            except Exception:
-                # Skip files that can't be processed
+            except Exception as e:
+                logger.warning("Failed to load %s: %s", f, e)
+                self.failed_count += 1
                 continue
 
         return documents
@@ -258,8 +267,9 @@ class DocumentLoader:
             try:
                 doc = self._load_remote_file(fs, scheme, remote_file)
                 documents.append(doc)
-            except Exception:
-                # Skip files that can't be processed
+            except Exception as e:
+                logger.warning("Failed to load %s: %s", remote_file, e)
+                self.failed_count += 1
                 continue
 
         if not documents:
@@ -340,7 +350,9 @@ class DocumentLoader:
                 if result.success:
                     return result.markdown, result.links.get("internal", [])
                 return None
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to load %s: %s", url, e)
+                self.failed_count += 1
                 return None
 
         async def run_crawler():

@@ -1,161 +1,14 @@
 """Hybrid search combining vector similarity with BM25 keyword matching."""
 
 import logging
-import math
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
+
+from rank_bm25 import BM25Okapi
 
 from .types import Citation
 
 logger = logging.getLogger(__name__)
-
-
-class BM25:
-    """
-    BM25 (Best Matching 25) implementation for keyword-based retrieval.
-
-    BM25 is a bag-of-words retrieval function that ranks documents based on
-    query term frequencies, with saturation and length normalization.
-    """
-
-    def __init__(
-        self,
-        k1: float = 1.5,
-        b: float = 0.75,
-        epsilon: float = 0.25,
-    ):
-        """
-        Initialize BM25.
-
-        Args:
-            k1: Term frequency saturation parameter (1.2-2.0 typical)
-            b: Length normalization parameter (0.75 typical)
-            epsilon: Floor for IDF to prevent negative values
-        """
-        self.k1 = k1
-        self.b = b
-        self.epsilon = epsilon
-
-        # Corpus statistics
-        self._corpus_size = 0
-        self._avgdl = 0.0
-        self._doc_freqs: Dict[str, int] = defaultdict(int)
-        self._idf: Dict[str, float] = {}
-        self._doc_lens: List[int] = []
-        self._tokenized_corpus: List[List[str]] = []
-
-    def _tokenize(self, text: str) -> List[str]:
-        """Simple tokenization with lowercasing and basic cleanup."""
-        import re
-        # Remove punctuation and split
-        tokens = re.findall(r'\b\w+\b', text.lower())
-        # Filter very short tokens
-        return [t for t in tokens if len(t) > 1]
-
-    def fit(self, corpus: List[str]) -> "BM25":
-        """
-        Fit BM25 on a corpus of documents.
-
-        Args:
-            corpus: List of document strings
-
-        Returns:
-            Self for chaining
-        """
-        self._tokenized_corpus = [self._tokenize(doc) for doc in corpus]
-        self._corpus_size = len(self._tokenized_corpus)
-
-        if self._corpus_size == 0:
-            return self
-
-        # Calculate document lengths
-        self._doc_lens = [len(doc) for doc in self._tokenized_corpus]
-        self._avgdl = sum(self._doc_lens) / self._corpus_size
-
-        # Calculate document frequencies
-        self._doc_freqs = defaultdict(int)
-        for doc in self._tokenized_corpus:
-            seen = set()
-            for token in doc:
-                if token not in seen:
-                    self._doc_freqs[token] += 1
-                    seen.add(token)
-
-        # Calculate IDF
-        self._idf = {}
-        for token, freq in self._doc_freqs.items():
-            # IDF with floor to avoid negative values
-            idf = math.log((self._corpus_size - freq + 0.5) / (freq + 0.5) + 1)
-            self._idf[token] = max(idf, self.epsilon)
-
-        return self
-
-    def score(self, query: str) -> List[float]:
-        """
-        Score all documents against a query.
-
-        Args:
-            query: Query string
-
-        Returns:
-            List of BM25 scores for each document
-        """
-        if self._corpus_size == 0:
-            return []
-
-        query_tokens = self._tokenize(query)
-        scores = []
-
-        for idx, doc_tokens in enumerate(self._tokenized_corpus):
-            score = 0.0
-            doc_len = self._doc_lens[idx]
-
-            # Count term frequencies in document
-            doc_tf = defaultdict(int)
-            for token in doc_tokens:
-                doc_tf[token] += 1
-
-            # BM25 scoring
-            for token in query_tokens:
-                if token not in self._idf:
-                    continue
-
-                tf = doc_tf.get(token, 0)
-                idf = self._idf[token]
-
-                # BM25 formula
-                numerator = tf * (self.k1 + 1)
-                denominator = tf + self.k1 * (1 - self.b + self.b * doc_len / self._avgdl)
-                score += idf * numerator / denominator
-
-            scores.append(score)
-
-        return scores
-
-    def get_top_k(
-        self,
-        query: str,
-        k: int = 10,
-    ) -> List[Tuple[int, float]]:
-        """
-        Get top-k document indices and scores.
-
-        Args:
-            query: Query string
-            k: Number of results
-
-        Returns:
-            List of (doc_index, score) tuples
-        """
-        scores = self.score(query)
-        if not scores:
-            return []
-
-        # Get top-k indices
-        indexed_scores = [(i, s) for i, s in enumerate(scores)]
-        indexed_scores.sort(key=lambda x: x[1], reverse=True)
-
-        return indexed_scores[:k]
 
 
 class HybridSearcher:
@@ -187,9 +40,17 @@ class HybridSearcher:
         self.use_rrf = use_rrf
         self.rrf_k = rrf_k
 
-        self._bm25: Optional[BM25] = None
+        self._bm25: Optional[BM25Okapi] = None
         self._chunk_texts: List[str] = []
         self._chunk_to_idx: Dict[str, int] = {}
+
+    def _tokenize(self, text: str) -> List[str]:
+        """Simple tokenization with lowercasing and basic cleanup."""
+        import re
+        # Remove punctuation and split
+        tokens = re.findall(r'\b\w+\b', text.lower())
+        # Filter very short tokens
+        return [t for t in tokens if len(t) > 1]
 
     def index_chunks(self, chunks: List[str]) -> None:
         """
@@ -200,8 +61,9 @@ class HybridSearcher:
         """
         self._chunk_texts = chunks
         self._chunk_to_idx = {text[:200]: i for i, text in enumerate(chunks)}
-        self._bm25 = BM25()
-        self._bm25.fit(chunks)
+        
+        tokenized_corpus = [self._tokenize(chunk) for chunk in chunks]
+        self._bm25 = BM25Okapi(tokenized_corpus)
         logger.info(f"Indexed {len(chunks)} chunks for BM25 search")
 
     def search(
@@ -230,7 +92,8 @@ class HybridSearcher:
             return vector_citations[:top_k]
 
         # Get BM25 scores for all indexed chunks
-        bm25_scores = self._bm25.score(query)
+        query_tokens = self._tokenize(query)
+        bm25_scores = self._bm25.get_scores(query_tokens)
 
         # Create mapping of chunk text to vector citation
         vector_scores: Dict[str, float] = {}
@@ -336,7 +199,7 @@ class HybridSearcher:
         combined: Dict[str, float] = {}
 
         # Normalize BM25 scores to 0-1
-        if bm25_scores:
+        if len(bm25_scores) > 0:
             max_bm25 = max(bm25_scores) if max(bm25_scores) > 0 else 1.0
             normalized_bm25 = [s / max_bm25 for s in bm25_scores]
         else:

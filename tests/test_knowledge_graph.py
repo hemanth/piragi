@@ -49,7 +49,7 @@ def test_knowledge_graph_add_triple(kg):
     kg.add_triple("Alice", "manages", "Bob")
 
     # Should store in triples list
-    assert ("alice", "manages", "bob") in kg.triples()
+    assert ("Alice", "manages", "Bob") in kg.triples()
 
 
 def test_knowledge_graph_triples(kg):
@@ -59,8 +59,8 @@ def test_knowledge_graph_triples(kg):
 
     triples = kg.triples()
     assert len(triples) == 2
-    assert ("alice", "manages", "bob") in triples
-    assert ("bob", "works_on", "project x") in triples
+    assert ("Alice", "manages", "Bob") in triples
+    assert ("Bob", "works_on", "Project X") in triples
 
 
 def test_knowledge_graph_search(kg):
@@ -70,10 +70,10 @@ def test_knowledge_graph_search(kg):
     kg.add_triple("Charlie", "reports_to", "Alice")
 
     # Search for Alice
-    results = kg.search("alice")
+    results = kg.search("Alice")
     assert len(results) == 2
-    assert ("alice", "manages", "bob") in results
-    assert ("charlie", "reports_to", "alice") in results
+    assert ("Alice", "manages", "Bob") in results
+    assert ("Charlie", "reports_to", "Alice") in results
 
 
 def test_knowledge_graph_to_context(kg):
@@ -81,9 +81,9 @@ def test_knowledge_graph_to_context(kg):
     kg.add_triple("Alice", "manages", "Bob")
     kg.add_triple("Bob", "works_on", "Project X")
 
-    context = kg.to_context("alice")
+    context = kg.to_context("Alice")
     assert "Known relationships:" in context
-    assert "alice manages bob" in context
+    assert "Alice manages Bob" in context
 
 
 def test_knowledge_graph_to_context_empty(kg):
@@ -108,9 +108,9 @@ def test_knowledge_graph_entities(kg):
     kg.add_triple("Bob", "works_on", "Project X")
 
     entities = kg.entities()
-    assert "alice" in entities
-    assert "bob" in entities
-    assert "project x" in entities
+    assert "Alice" in entities
+    assert "Bob" in entities
+    assert "Project X" in entities
 
 
 def test_knowledge_graph_neighbors(kg):
@@ -118,9 +118,9 @@ def test_knowledge_graph_neighbors(kg):
     kg.add_triple("Alice", "manages", "Bob")
     kg.add_triple("Alice", "works_on", "Project X")
 
-    neighbors = kg.neighbors("alice")
-    assert "bob" in neighbors
-    assert "project x" in neighbors
+    neighbors = kg.neighbors("Alice")
+    assert "Bob" in neighbors
+    assert "Project X" in neighbors
 
 
 def test_knowledge_graph_clear(kg_with_persist):
@@ -149,7 +149,7 @@ def test_knowledge_graph_save_load(kg_with_persist):
     # Verify file contents
     with open(persist_path) as f:
         data = json.load(f)
-    assert ("alice", "manages", "bob") in [tuple(t) for t in data["triples"]]
+    assert ("Alice", "manages", "Bob") in [tuple(t) for t in data["triples"]]
 
 
 def test_knowledge_graph_load_on_init(tmp_path):
@@ -165,7 +165,7 @@ def test_knowledge_graph_load_on_init(tmp_path):
 
     # Create second instance - should load existing data
     kg2 = KnowledgeGraph(persist_path=persist_path)
-    assert ("alice", "manages", "bob") in kg2.triples()
+    assert ("Alice", "manages", "Bob") in kg2.triples()
 
 
 def test_knowledge_graph_extract_and_add(kg):
@@ -185,7 +185,7 @@ def test_knowledge_graph_extract_and_add(kg):
 
     assert len(triples) == 1
     assert triples[0] == ("Alice", "manages", "Bob")
-    assert ("alice", "manages", "bob") in kg.triples()
+    assert ("Alice", "manages", "Bob") in kg.triples()
 
 
 def test_knowledge_graph_extract_handles_markdown(kg):
@@ -203,7 +203,7 @@ def test_knowledge_graph_extract_handles_markdown(kg):
     )
 
     assert len(triples) == 1
-    assert ("alice", "manages", "bob") in kg.triples()
+    assert ("Alice", "manages", "Bob") in kg.triples()
 
 
 def test_knowledge_graph_extract_handles_errors(kg):
@@ -228,7 +228,7 @@ def test_knowledge_graph_get_relations(kg):
     kg.add_triple("Bob", "works_on", "Project X")
     kg.add_triple("Charlie", "reports_to", "Alice")
 
-    relations = kg.get_relations("alice")
+    relations = kg.get_relations("Alice")
     assert len(relations) == 2
-    assert ("alice", "manages", "bob") in relations
-    assert ("charlie", "reports_to", "alice") in relations
+    assert ("Alice", "manages", "Bob") in relations
+    assert ("Charlie", "reports_to", "Alice") in relations

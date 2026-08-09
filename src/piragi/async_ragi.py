@@ -197,9 +197,10 @@ class _AddIterator:
     def __init__(self, ragi: AsyncRagi, sources: Union[str, List[str]]) -> None:
         self._ragi = ragi
         self._sources = sources
-        self._queue: queue.Queue = queue.Queue()
-        self._done = False
+        self._queue: Optional[asyncio.Queue] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._task: Optional[asyncio.Task] = None
+        self._DONE = object()
 
     def __aiter__(self) -> AsyncIterator[str]:
         return self
@@ -207,24 +208,25 @@ class _AddIterator:
     async def __anext__(self) -> str:
         # Start the background task on first iteration
         if self._task is None:
+            self._loop = asyncio.get_running_loop()
+            self._queue = asyncio.Queue()
             self._task = asyncio.create_task(self._run_in_thread())
 
-        # Poll for progress messages
-        while True:
-            try:
-                msg = self._queue.get_nowait()
-                return msg
-            except queue.Empty:
-                if self._done:
-                    raise StopAsyncIteration
-                # Wait a bit before polling again
-                await asyncio.sleep(0.05)
+        msg = await self._queue.get()
+        if msg is self._DONE:
+            # Await task to propagate any exceptions
+            await self._task
+            raise StopAsyncIteration
+            
+        return msg
 
     async def _run_in_thread(self) -> None:
         def on_progress(msg: str) -> None:
-            self._queue.put(msg)
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, msg)
 
-        await asyncio.to_thread(
-            self._ragi._sync.add, self._sources, on_progress
-        )
-        self._done = True
+        try:
+            await asyncio.to_thread(
+                self._ragi._sync.add, self._sources, on_progress
+            )
+        finally:
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, self._DONE)

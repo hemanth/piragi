@@ -3,597 +3,911 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>piragi Playground</title>
-    <!-- Fonts -->
+    <title>piragi playground</title>
+    <meta name="description" content="Interactive playground for piragi — zero-config RAG library">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <!-- Prism.js CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
-            --bg-color: #0d0f12;
-            --text-main: #f0f4f8;
-            --text-muted: #8b949e;
-            --accent: #00d2ff;
-            --accent-alt: #3a7bd5;
-            --card-bg: rgba(20, 24, 30, 0.6);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --button-bg: rgba(255, 255, 255, 0.1);
-            --button-hover: rgba(255, 255, 255, 0.15);
-            --font-sans: 'Inter', sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --bg: #0a0c10; --bg2: #12151c; --bg3: #1a1e28;
+            --surface: rgba(18,22,30,0.75); --border: rgba(255,255,255,0.06);
+            --text: #c9d1d9; --muted: #7d8590; --dim: #484f58;
+            --accent: #9ca3af; --green: #6b7280; --cyan: #9ca3af;
+            --font: 'Inter',system-ui,sans-serif; --mono: 'JetBrains Mono',monospace;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--font-sans);
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            line-height: 1.6;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(58, 123, 213, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 85% 30%, rgba(0, 210, 255, 0.15) 0%, transparent 50%);
-            background-attachment: fixed;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 4rem 2rem;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 4rem;
-            animation: fadeInDown 0.8s ease-out;
-        }
-
-        h1 {
-            font-size: 3.5rem;
-            font-weight: 800;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, var(--accent), var(--accent-alt));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.03em;
-        }
-
-        .tagline {
-            font-size: 1.25rem;
-            color: var(--text-muted);
-            margin-bottom: 1.5rem;
-        }
-
-        .badges {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .badge {
-            background: var(--button-bg);
-            border: 1px solid var(--card-border);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-family: var(--font-mono);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: var(--text-main);
-            transition: all 0.2s ease;
-        }
-
-        .badge:hover {
-            background: var(--button-hover);
-            transform: translateY(-2px);
-        }
-
-        .cell-container {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        .cell {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 1.5rem;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            animation: fadeInUp 0.8s ease-out backwards;
-        }
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
         
-        .cell:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.15);
-        }
-
-        .cell-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .cell-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .run-btn {
-            background: rgba(0, 210, 255, 0.1);
-            color: var(--accent);
-            border: 1px solid rgba(0, 210, 255, 0.3);
-            padding: 0.4rem 1rem;
-            border-radius: 6px;
-            font-family: var(--font-sans);
-            font-weight: 600;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .run-btn:hover {
-            background: rgba(0, 210, 255, 0.2);
-            box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
-        }
+        /* ── Header ── */
+        .header{display:flex;align-items:center;gap:1rem;padding:.6rem 1.2rem;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;z-index:10}
+        .logo{font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-0.03em}
+        .status{display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--muted);padding:.25rem .6rem;border-radius:20px;border:1px solid var(--border);background:rgba(255,255,255,0.03)}
+        .status-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0}
+        .status-dot.live{background:#6ee7b7;box-shadow:0 0 4px rgba(110,231,183,0.4)}
+        .header-right{margin-left:auto;display:flex;gap:.8rem;align-items:center}
+        .pip-badge{font-family:var(--mono);font-size:.7rem;color:var(--muted);padding:.25rem .6rem;border-radius:4px;background:rgba(255,255,255,0.04);border:1px solid var(--border)}
+        .gh-link{color:var(--muted);text-decoration:none;display:flex;align-items:center;transition:color .2s}
+        .gh-link:hover{color:var(--text)}
+        .gh-link svg{width:18px;height:18px;fill:currentColor}
         
-        .run-btn:active {
-            transform: scale(0.96);
-        }
-
-        .run-btn svg {
-            width: 14px;
-            height: 14px;
-            fill: currentColor;
-        }
-
-        .editor-wrapper {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #1d1f21; /* Match prism tomorrow background */
-        }
-
-        /* Sync text formatting for textarea and pre */
-        .code-textarea, .code-display {
-            font-family: var(--font-mono);
-            font-size: 14px;
-            line-height: 1.5;
-            padding: 1rem;
-            width: 100%;
-            height: 100%;
-            border: none;
-            outline: none;
-            margin: 0;
-            white-space: pre;
-            word-wrap: normal;
-            overflow-x: auto;
-            tab-size: 4;
-        }
-
-        .code-textarea {
-            position: absolute;
-            top: 0;
-            left: 0;
-            color: transparent;
-            background: transparent;
-            caret-color: var(--text-main);
-            z-index: 2;
-            resize: none;
-            overflow: hidden; /* handled by auto-resize JS */
-        }
-
-        .code-display {
-            position: relative;
-            z-index: 1;
-            pointer-events: none;
-        }
+        /* ── Main layout ── */
+        .main{display:flex;flex:1;overflow:hidden}
         
-        /* Prism overrides */
-        pre[class*="language-"] {
-            margin: 0 !important;
-            padding: 1rem !important;
-            background: transparent !important;
-            text-shadow: none !important;
-            border-radius: 0 !important;
-        }
+        /* ── Sidebar ── */
+        .sidebar{width:180px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg2);padding:.5rem 0;overflow-y:auto;display:flex;flex-direction:column}
+        .sidebar-title{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:.5rem 1rem .3rem;font-weight:600}
+        .tab{padding:.5rem 1rem;font-size:.8rem;color:var(--muted);cursor:pointer;border-left:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:.5rem}
+        .tab:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+        .tab.active{color:var(--text);border-left-color:var(--text);background:rgba(255,255,255,0.04)}
+        .tab-icon{font-size:.85rem;width:1.2rem;text-align:center}
+        .tab-dot{width:5px;height:5px;border-radius:50%;margin-left:auto;flex-shrink:0}
+        .tab-dot.has-output{background:#6b7280}
+        .tab-dot.has-error{background:#b45555}
+        .tab-dot.running{background:#9ca3af;animation:blink 1s step-start infinite}
+        .sidebar-footer{margin-top:auto;padding:.8rem 1rem;border-top:1px solid var(--border);font-size:.65rem;color:var(--dim)}
+        .sidebar-footer a{color:var(--dim);text-decoration:none}
+        .sidebar-footer a:hover{color:var(--muted)}
+        .llm-panel{padding:.6rem .8rem;border-top:1px solid var(--border);font-size:.7rem}
+        .llm-panel summary{cursor:pointer;color:var(--muted);font-weight:600;font-size:.65rem;text-transform:uppercase;letter-spacing:.06em}
+        .llm-panel label{display:block;color:var(--dim);margin-top:.4rem;font-size:.6rem;text-transform:uppercase;letter-spacing:.04em}
+        .llm-panel input,.llm-panel select{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:4px;padding:.3rem .5rem;color:var(--text);font-family:var(--mono);font-size:.7rem;margin-top:.15rem}
+        .llm-panel input:focus,.llm-panel select:focus{outline:none;border-color:rgba(255,255,255,0.15)}
+        .llm-panel .llm-status{margin-top:.4rem;padding:.2rem .4rem;border-radius:3px;font-size:.6rem}
+        .llm-panel .llm-ok{background:rgba(110,231,183,0.1);color:#6ee7b7}
+        .llm-panel .llm-off{background:rgba(180,85,85,0.1);color:#b45555}
         
-        code[class*="language-"] {
-            font-family: var(--font-mono) !important;
-            font-size: 14px !important;
-            line-height: 1.5 !important;
-            text-shadow: none !important;
-        }
-
-        .output-wrapper {
-            margin-top: 1rem;
-            background: #000;
-            border-radius: 8px;
-            border: 1px solid var(--card-border);
-            padding: 1rem;
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            color: #a5d6ff;
-            display: none; /* hidden initially */
-            white-space: pre-wrap;
-            position: relative;
-        }
+        /* ── Editor area ── */
+        .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+        .cell-header{display:flex;align-items:center;padding:.4rem 1rem;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;gap:.6rem}
+        .cell-title{font-size:.8rem;font-weight:600;color:var(--text)}
+        .cell-lang{font-size:.65rem;color:var(--dim);font-family:var(--mono);padding:.15rem .4rem;border-radius:3px;background:rgba(255,255,255,0.04)}
+        .run-btn{margin-left:auto;background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--border);padding:.3rem .8rem;border-radius:5px;font-family:var(--font);font-weight:600;font-size:.75rem;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:.35rem}
+        .run-btn:hover{background:rgba(255,255,255,0.1)}
+        .run-btn:active{transform:scale(0.97)}
+        .run-btn:disabled{opacity:.4;cursor:default;pointer-events:none}
+        .run-btn.running{background:rgba(255,255,255,0.03);color:var(--dim)}
+        .run-btn svg{width:11px;height:11px;fill:currentColor}
         
-        .output-wrapper.visible {
-            display: block;
-            animation: fadeIn 0.4s ease-out;
-        }
+        /* ── Code pane ── */
+        .code-pane{flex:1;position:relative;overflow:hidden;background:#0d1117;min-height:0}
+        #ace-editor{position:absolute;inset:0;font-size:13px!important}
         
-        .typing-cursor::after {
-            content: '▋';
-            animation: blink 1s step-start infinite;
-            color: #a5d6ff;
-        }
-
-        footer {
-            margin-top: 5rem;
-            text-align: center;
-            padding-top: 2rem;
-            border-top: 1px solid var(--card-border);
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
+        /* ── Output pane ── */
+        .output-bar{display:flex;align-items:center;padding:.3rem 1rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;cursor:row-resize;user-select:none}
+        .output-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:600}
+        .output-clear{margin-left:auto;font-size:.65rem;color:var(--muted);cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:3px;padding:.15rem .5rem;font-family:var(--font);transition:color .15s}
+        .output-clear:hover{color:var(--text);background:rgba(255,255,255,0.08)}
+        .output-pane{height:180px;overflow:auto;background:#000;padding:.6rem 1rem;font-family:var(--mono);font-size:.8rem;line-height:1.5;color:#a0a0a0;white-space:pre-wrap;flex-shrink:0}
+        .output-pane:empty::after{content:'Click Run or Ctrl+Enter';color:var(--dim);font-style:italic}
+        .output-bar .drag-hint{width:24px;height:3px;border-radius:2px;background:var(--dim);opacity:.4;margin:0 .5rem}
+        .typing-cursor::after{content:'_';animation:blink 1s step-start infinite;color:#a0a0a0}
+        .data-prep{border-bottom:1px solid var(--border);background:rgba(255,255,255,0.015);flex-shrink:0}
+        .data-prep summary{padding:.35rem 1rem;font-size:.65rem;color:var(--dim);cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-weight:600;font-family:var(--font)}
+        .data-prep summary:hover{color:var(--muted)}
+        .data-prep pre{margin:0;padding:.4rem 1rem .6rem;font-family:var(--mono);font-size:12px;line-height:1.5;white-space:pre-wrap;max-height:200px;overflow:auto}
+        .data-prep pre code{font-family:inherit;font-size:inherit;color:#6b7280}
+        .sim-toggle{display:flex;align-items:center;gap:.35rem;font-size:.65rem;color:var(--dim);cursor:pointer;margin-right:.5rem}
+        .sim-toggle input{accent-color:#6b7280}
+        .demo-banner{display:none;padding:.3rem 1rem;font-size:.7rem;color:var(--dim);background:rgba(255,255,255,0.02);border-bottom:1px solid var(--border);font-family:var(--mono)}
+        .demo-banner code{color:var(--muted)}
+        .file-panel{border-top:1px solid var(--border);margin-top:auto;padding:.4rem 0}
+        .file-panel summary{padding:.35rem .8rem;font-size:.65rem;color:var(--dim);cursor:pointer;text-transform:uppercase;letter-spacing:.06em;font-weight:600;font-family:var(--font)}
+        .file-breadcrumb{padding:.2rem .8rem;font-size:.6rem;color:var(--dim);font-family:var(--mono);word-break:break-all}
+        .file-list{max-height:200px;overflow-y:auto}
+        .file-entry{display:flex;justify-content:space-between;padding:.2rem .8rem;font-size:.65rem;color:var(--muted);font-family:var(--mono);cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .file-entry:hover{background:rgba(255,255,255,0.03)}
+        .file-entry .fe-name{color:var(--text)}
+        .file-entry.fe-dir .fe-name::before{content:'📁 '}
+        .file-entry.fe-file .fe-name::before{content:'📄 '}
+        .file-entry .fe-meta{color:var(--dim);font-size:.6rem}
+        .file-use-btn{display:block;margin:.3rem .8rem;padding:.25rem;font-size:.6rem;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;font-family:var(--mono);text-align:center}
+        .file-use-btn:hover{background:rgba(255,255,255,0.08)}
         
-        footer a {
-            color: var(--text-muted);
-            text-decoration: none;
-            margin: 0 0.5rem;
-            transition: color 0.2s;
-        }
+        /* -- Landing overlay -- */
+        .landing{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .6s,visibility .6s;overflow-y:auto}
+        .landing.hidden{opacity:0;visibility:hidden;pointer-events:none}
+        .landing::before{content:'';position:fixed;inset:-50%;width:200%;height:200%;background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,0.02) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(255,255,255,0.015) 0%,transparent 50%);animation:drift 20s ease-in-out infinite alternate;pointer-events:none}
+        @keyframes drift{from{transform:translate(0,0)}to{transform:translate(-3%,2%)}}
+        .landing-inner{position:relative;z-index:1;max-width:640px;width:100%;padding:2rem 2rem 3rem;display:flex;flex-direction:column;align-items:center;gap:2rem;margin:auto}
+        .landing-hero{text-align:center}
+        .landing-logo{font-size:3.5rem;font-weight:800;color:var(--text);letter-spacing:-0.05em;line-height:1}
+        .landing-sub{color:var(--muted);font-size:1rem;margin-top:.6rem}
+        .landing-terminal{width:100%;background:#0d0f12;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+        .landing-term-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
+        .landing-term-dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,0.08)}
+        .landing-term-title{margin-left:auto;margin-right:auto;font-size:.65rem;color:var(--dim);font-family:var(--mono)}
+        .landing-term-body{padding:1rem 1.2rem;font-family:var(--mono);font-size:.8rem;line-height:1.7;color:var(--muted)}
+        .landing-term-body .t-prompt{color:var(--dim)}
+        .landing-term-body .t-cmd{color:var(--text)}
+        .landing-term-body .t-out{color:#6b7280}
+        .landing-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1px;width:100%;max-width:640px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+        .landing-card{background:var(--bg);padding:.7rem .9rem}
+        .landing-card-title{font-size:.7rem;font-weight:600;color:var(--text);margin-bottom:.15rem;font-family:var(--mono)}
+        .landing-card-desc{font-size:.65rem;color:var(--dim);line-height:1.3}
+        .landing-actions{display:flex;gap:1rem;align-items:center}
+        .landing-enter{background:var(--text);color:var(--bg);border:none;padding:.6rem 1.8rem;border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:var(--font);transition:opacity .15s}
+        .landing-enter:hover{opacity:.85}
+        .landing-meta{font-size:.7rem;color:var(--dim);font-family:var(--mono)}
         
-        footer a:hover {
-            color: var(--text-main);
-        }
-
-        @keyframes blink {
-            50% { opacity: 0; }
-        }
-        
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* Stagger cell animations */
-        .cell:nth-child(1) { animation-delay: 0.1s; }
-        .cell:nth-child(2) { animation-delay: 0.2s; }
-        .cell:nth-child(3) { animation-delay: 0.3s; }
-        .cell:nth-child(4) { animation-delay: 0.4s; }
-        .cell:nth-child(5) { animation-delay: 0.5s; }
-        .cell:nth-child(6) { animation-delay: 0.6s; }
-
-        @media (max-width: 600px) {
-            h1 { font-size: 2.5rem; }
-            .container { padding: 2rem 1rem; }
-            .badges { flex-direction: column; }
+        @keyframes blink{50%{opacity:0}}
+        @media(max-width:700px){
+            .sidebar{width:50px}.tab span{display:none}.tab{justify-content:center;padding:.6rem}
+            .landing-grid{grid-template-columns:1fr 1fr 1fr}.landing-logo{font-size:2.5rem}
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>piragi</h1>
-        <p class="tagline">zero-config RAG — try it interactively</p>
-        <div class="badges">
-            <div class="badge">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                pip install piragi
-            </div>
-            <a href="https://github.com/hemanth/piragi" class="badge">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
-                GitHub
-            </a>
-        </div>
-    </header>
-
-    <div class="cell-container">
-        
-        <!-- Cell 1: Setup -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">1. Setup</span>
-                <button class="run-btn" onclick="runCell(0)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
-            </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(0)">pip install piragi</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-bash" id="code-0">pip install piragi</code></pre>
-                </div>
-            </div>
-            <div class="output-wrapper" id="out-0"></div>
+<!-- Landing page -->
+<div class="landing" id="landing">
+    <div class="landing-inner">
+        <div class="landing-hero">
+            <div class="landing-logo">piragi</div>
+            <div class="landing-sub">zero-config RAG for Python</div>
         </div>
 
-        <!-- Cell 2: Basic RAG -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">2. Basic RAG</span>
-                <button class="run-btn" onclick="runCell(1)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
+        <div class="landing-terminal">
+            <div class="landing-term-bar">
+                <div class="landing-term-dot"></div>
+                <div class="landing-term-dot"></div>
+                <div class="landing-term-dot"></div>
+                <span class="landing-term-title">python3</span>
             </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(1)">from piragi import Ragi
-
-kb = Ragi("./docs")
-answer = kb.ask("How do I deploy?")
-print(answer.text)
-print(f"Citations: {len(answer.citations)}")</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-python" id="code-1">from piragi import Ragi
-
-kb = Ragi("./docs")
-answer = kb.ask("How do I deploy?")
-print(answer.text)
-print(f"Citations: {len(answer.citations)}")</code></pre>
-                </div>
+            <div class="landing-term-body">
+                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">from piragi import Ragi</span><br>
+                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">kb = Ragi("./docs")</span><br>
+                <span class="t-out">indexing 847 chunks...</span><br>
+                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">kb.retrieve("deploy to production")</span><br>
+                <span class="t-out">[Citation(source="deploy.md", score=0.94), ...]</span>
             </div>
-            <div class="output-wrapper" id="out-1"></div>
         </div>
 
-        <!-- Cell 3: ONNX Speedup -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">3. ONNX Speedup</span>
-                <button class="run-btn" onclick="runCell(2)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
+        <div class="landing-grid">
+            <div class="landing-card">
+                <div class="landing-card-title">zero config</div>
+                <div class="landing-card-desc">Works with free local models out of the box</div>
             </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(2)">from piragi import Ragi
-
-kb = Ragi("./docs", config={"embedding": {"backend": "onnx"}})
-# 2-5x faster on CPU</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-python" id="code-2">from piragi import Ragi
-
-kb = Ragi("./docs", config={"embedding": {"backend": "onnx"}})
-# 2-5x faster on CPU</code></pre>
-                </div>
+            <div class="landing-card">
+                <div class="landing-card-title">all formats</div>
+                <div class="landing-card-desc">PDF, Word, Excel, Markdown, code, URLs, images, audio</div>
             </div>
-            <div class="output-wrapper" id="out-2"></div>
+            <div class="landing-card">
+                <div class="landing-card-title">remote storage</div>
+                <div class="landing-card-desc">Read from S3, GCS, Azure, HDFS with glob patterns</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">web crawling</div>
+                <div class="landing-card-desc">Recursively crawl websites with /** syntax</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">auto-updates</div>
+                <div class="landing-card-desc">Background refresh, queries never blocked</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">citations</div>
+                <div class="landing-card-desc">Every answer includes scored sources</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">vector stores</div>
+                <div class="landing-card-desc">Lance, Postgres, Qdrant, Pinecone, Supabase</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">retrieval</div>
+                <div class="landing-card-desc">HyDE, hybrid search, cross-encoder reranking</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">chunking</div>
+                <div class="landing-card-desc">Semantic, hierarchical, and contextual strategies</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">knowledge graph</div>
+                <div class="landing-card-desc">Entity/relationship extraction for deeper answers</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">onnx</div>
+                <div class="landing-card-desc">2-5x faster embeddings on CPU via ONNX Runtime</div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-card-title">async</div>
+                <div class="landing-card-desc">Non-blocking API for web frameworks</div>
+            </div>
         </div>
 
-        <!-- Cell 4: Shared Embedder -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">4. Shared Embedder</span>
-                <button class="run-btn" onclick="runCell(3)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
-            </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(3)">from piragi import Ragi, EmbeddingGenerator
-
-embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
-kb_docs = Ragi("./docs", embedder=embedder)
-kb_code = Ragi("./src", embedder=embedder)
-# One model, multiple knowledge bases</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-python" id="code-3">from piragi import Ragi, EmbeddingGenerator
-
-embedder = EmbeddingGenerator(model="all-mpnet-base-v2")
-kb_docs = Ragi("./docs", embedder=embedder)
-kb_code = Ragi("./src", embedder=embedder)
-# One model, multiple knowledge bases</code></pre>
-                </div>
-            </div>
-            <div class="output-wrapper" id="out-3"></div>
+        <div class="landing-actions">
+            <button class="landing-enter" onclick="enterPlayground()">Open Playground</button>
+            <span class="landing-meta">v0.8.1</span>
         </div>
-
-        <!-- Cell 5: Qdrant + TurboQuant -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">5. Qdrant + TurboQuant</span>
-                <button class="run-btn" onclick="runCell(4)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
-            </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(4)">from piragi.stores import QdrantStore
-
-store = QdrantStore(
-    url="http://localhost:6333",
-    quantization="turboquant",
-)
-kb = Ragi("./docs", store=store)</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-python" id="code-4">from piragi.stores import QdrantStore
-
-store = QdrantStore(
-    url="http://localhost:6333",
-    quantization="turboquant",
-)
-kb = Ragi("./docs", store=store)</code></pre>
-                </div>
-            </div>
-            <div class="output-wrapper" id="out-4"></div>
-        </div>
-
-        <!-- Cell 6: Async -->
-        <div class="cell">
-            <div class="cell-header">
-                <span class="cell-title">6. Async</span>
-                <button class="run-btn" onclick="runCell(5)">
-                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Run
-                </button>
-            </div>
-            <div class="editor-wrapper">
-                <textarea class="code-textarea" spellcheck="false" oninput="updateCode(5)">from piragi import AsyncRagi
-
-async_kb = AsyncRagi("./docs")
-answer = await async_kb.ask("What's the API?")</textarea>
-                <div class="code-display" aria-hidden="true">
-                    <pre><code class="language-python" id="code-5">from piragi import AsyncRagi
-
-async_kb = AsyncRagi("./docs")
-answer = await async_kb.ask("What's the API?")</code></pre>
-                </div>
-            </div>
-            <div class="output-wrapper" id="out-5"></div>
-        </div>
-
     </div>
-
-    <footer>
-        <p>Made by <a href="https://github.com/hemanth">@hemanth</a> &bull; 
-        <a href="https://github.com/hemanth/piragi">Docs</a> &bull; 
-        <a href="https://pypi.org/project/piragi/">PyPI</a></p>
-    </footer>
 </div>
 
-<!-- Prism.js -->
+<!-- App -->
+<div class="header">
+    <div class="logo">piragi</div>
+    <div class="status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">connecting…</span>
+    </div>
+    <div class="header-right">
+        <label class="sim-toggle"><input type="checkbox" id="sim-check" onchange="toggleSimulation()">simulate</label>
+        <div class="pip-badge">pip install piragi</div>
+        <a href="https://github.com/hemanth/piragi" class="gh-link" target="_blank">
+            <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+    </div>
+</div>
+
+<div class="main">
+    <div class="sidebar">
+        <div class="sidebar-title">Cells</div>
+        <div class="tab active" onclick="switchTab(0)" id="tab-0"><span class="tab-icon">1</span><span>Basic RAG</span></div>
+        <div class="tab" onclick="switchTab(1)" id="tab-1"><span class="tab-icon">2</span><span>Embeddings</span></div>
+        <div class="tab" onclick="switchTab(2)" id="tab-2"><span class="tab-icon">3</span><span>Shared Model</span></div>
+        <div class="tab" onclick="switchTab(3)" id="tab-3"><span class="tab-icon">4</span><span>Qdrant Store</span></div>
+        <div class="tab" onclick="switchTab(4)" id="tab-4"><span class="tab-icon">5</span><span>Chunking</span></div>
+        <div class="tab" onclick="switchTab(5)" id="tab-5"><span class="tab-icon">6</span><span>Retrieval</span></div>
+        <div class="tab" onclick="switchTab(6)" id="tab-6"><span class="tab-icon">7</span><span>Knowledge Graph</span></div>
+        <div class="tab" onclick="switchTab(7)" id="tab-7"><span class="tab-icon">8</span><span>Async</span></div>
+        <div class="tab" onclick="switchTab(8)" id="tab-8"><span class="tab-icon">9</span><span>Config</span></div>
+        <div class="tab" onclick="switchTab(9)" id="tab-9"><span class="tab-icon">10</span><span>Ask (LLM)</span></div>
+        <details class="file-panel" id="file-panel" style="display:none">
+            <summary>Files</summary>
+            <div class="file-breadcrumb" id="file-path">~</div>
+            <div class="file-list" id="file-list"></div>
+            <button class="file-use-btn" onclick="insertFilePath()">Use as source</button>
+        </details>
+        <div class="llm-panel">
+            <details id="llm-details">
+                <summary>LLM Config</summary>
+                <div class="llm-status llm-off" id="llm-status">no LLM detected</div>
+                <label>Model</label>
+                <input id="llm-model" value="llama3.2" placeholder="llama3.2">
+                <label>Base URL</label>
+                <input id="llm-url" placeholder="http://localhost:11434/v1">
+                <label>API Key</label>
+                <input id="llm-key" type="password" placeholder="(optional)">
+                <button class="run-btn" style="margin-top:.5rem;width:100%;justify-content:center" onclick="saveLLMConfig()">Save</button>
+            </details>
+        </div>
+        <div class="sidebar-footer">
+            <a href="https://github.com/hemanth/piragi">docs</a> . <a href="https://pypi.org/project/piragi/">pypi</a><br>
+            by <a href="https://github.com/hemanth">@hemanth</a>
+        </div>
+    </div>
+
+    <div class="editor-area">
+        <div class="cell-header">
+            <span class="cell-title" id="cell-title">Basic RAG</span>
+            <button class="output-clear" onclick="resetCellCode()" style="margin-left:.5rem">reset</button>
+            <span class="cell-lang" id="cell-lang" style="margin-left:.5rem">python</span>
+            <button class="run-btn" id="run-btn" onclick="runCell()" style="margin-left:auto">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run
+            </button>
+        </div>
+        <div class="demo-banner" id="demo-banner">demo mode — <code>pip install piragi && piragi playground</code> for live execution</div>
+        <details class="data-prep" id="data-prep" style="display:none">
+            <summary>Data Preparation</summary>
+            <pre><code id="data-prep-code" class="language-python"></code></pre>
+        </details>
+        <div class="code-pane">
+            <div id="ace-editor"></div>
+        </div>
+        <div class="output-bar" id="output-bar">
+            <span class="output-label">Output</span>
+            <span class="drag-hint"></span>
+            <button class="output-clear" onclick="clearOutput()">clear</button>
+        </div>
+        <div class="output-pane" id="output"></div>
+    </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.35.5/ace.js"></script>
 <script>
-    // Outputs for simulation
-    const simulatedOutputs = [
-        `Collecting piragi
-Downloading piragi-0.1.0-py3-none-any.whl (42 kB)
-Installing collected packages: piragi
-Successfully installed piragi-0.1.0`,
+const cells = [
+  { title:'Basic RAG', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/deploy.md", "w") as f:
+    f.write("To deploy piragi, build a Docker image with your docs baked in. "
+            "Set OPENAI_API_KEY as an env var. Run the container on port 8080. "
+            "Use a reverse proxy like nginx for TLS termination.")
+with open(docs + "/config.md", "w") as f:
+    f.write("piragi supports Lance, Postgres, Qdrant, and Pinecone as vector stores. "
+            "Configure via store URIs: qdrant://localhost:6333 or postgres://user:pass@host/db. "
+            "Default store is Lance, which requires no external server.")`,
+    code:`from piragi import Ragi
 
-        `To deploy piragi, you can build a Docker container with your docs and run the server module. Ensure you have the OPENAI_API_KEY exported in your environment. For production, consider using Qdrant or Milvus instead of the default local store.
-Citations: 2`,
+kb = Ragi(docs, persist_dir=tmp,
+          config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
+print("indexed", kb.count(), "chunks")
 
-        `[INFO] Loading ONNX runtime...
-[INFO] Embedding generation: 14.2ms (was 48.5ms with PyTorch)
-[INFO] Speedup: ~3.4x faster`,
+results = kb.retrieve("how do I deploy?")
+for r in results:
+    print("--", os.path.basename(r.source))
+    print(r.chunk[:150])
+    print()` },
+  { title:'Embeddings', lang:'python', code:`from piragi import EmbeddingGenerator
 
-        `[INFO] Initializing shared embedding model all-mpnet-base-v2
-[INFO] Processing ./docs (152 chunks)... done.
-[INFO] Processing ./src (480 chunks)... done.
-[INFO] Total memory saved: ~1.2GB`,
+emb = EmbeddingGenerator(model="BAAI/bge-small-en-v1.5")
+vec = emb.embed_query("hello world")
+print("model:", emb.model_name)
+print("dim:  ", len(vec))
+print("vec:   [{:.4f}, {:.4f}, ...]".format(vec[0], vec[1]))` },
+  { title:'Shared Model', lang:'python', code:`import tempfile
+from piragi import Ragi, EmbeddingGenerator
 
-        `[INFO] Connecting to Qdrant at http://localhost:6333
-[INFO] Initializing collection with TurboQuant (int8)...
-[INFO] Storage optimized. Index size reduced by 75%.`,
+embedder = EmbeddingGenerator(model="BAAI/bge-small-en-v1.5")
+kb1 = Ragi("./README.md", persist_dir=tempfile.mkdtemp(), embedder=embedder)
+kb2 = Ragi("./pyproject.toml", persist_dir=tempfile.mkdtemp(), embedder=embedder)
+print("kb1:", kb1.count(), "chunks")
+print("kb2:", kb2.count(), "chunks")
+print("shared embedder:", id(kb1.embedder) == id(kb2.embedder))` },
+  { title:'Qdrant Store', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/api.md", "w") as f:
+    f.write("The REST API runs on port 8080. POST /ask with a JSON body "
+            "containing query and top_k fields. Returns citations and answer.")
+with open(docs + "/setup.md", "w") as f:
+    f.write("Install piragi with pip install piragi[qdrant]. "
+            "Start Qdrant with docker run -p 6333:6333 qdrant/qdrant.")`,
+    code:`from piragi import Ragi
+from piragi.stores import QdrantStore
 
-        `[INFO] Running async event loop...
-The API provides both synchronous (Ragi) and asynchronous (AsyncRagi) interfaces. You can use the standard await syntax for non-blocking embedding and LLM calls in FastAPI or Starlette apps.`
-    ];
+store = QdrantStore(
+    collection_name="demo",
+    quantization="scalar",
+    vector_dimension=384,
+)
+kb = Ragi(docs, persist_dir=tmp, store=store,
+          config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
+print("store:", type(store).__name__)
+print("quantization: scalar (int8)")
+print("chunks:", store.count())
+results = kb.retrieve("how to use the API")
+for r in results:
+    print("--", os.path.basename(r.source))
+    print(r.chunk[:120])` },
+  { title:'Chunking', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/guide.md", "w") as f:
+    f.write("# Getting Started\\n\\nInstall piragi with pip install piragi. "
+            "Create a Ragi instance pointing to your docs folder. "
+            "The library handles chunking, embedding, and storage automatically.\\n\\n"
+            "# Configuration\\n\\nCustomize chunk size, overlap, and strategy. "
+            "Semantic chunking splits at topic boundaries. "
+            "Hierarchical chunking creates parent-child relationships for context.")`,
+    code:`from piragi import Ragi
 
-    // Setup Textareas
-    document.querySelectorAll('.code-textarea').forEach((textarea, i) => {
-        // Sync scroll
-        const pre = document.querySelector(`#code-${i}`).parentElement;
-        textarea.addEventListener('scroll', () => {
-            pre.scrollTop = textarea.scrollTop;
-            pre.scrollLeft = textarea.scrollLeft;
-        });
+# Fixed chunking (default)
+kb_fixed = Ragi(docs, persist_dir=tmp + "/fixed",
+    config={"embedding": {"model": "BAAI/bge-small-en-v1.5"},
+            "chunk": {"strategy": "fixed", "size": 256, "overlap": 50}})
+print("fixed:", kb_fixed.count(), "chunks")
 
-        // Initial sizing
-        const adjustHeight = () => {
-            textarea.style.height = 'auto';
-            textarea.style.height = (textarea.scrollHeight) + 'px';
-        };
-        textarea.addEventListener('input', adjustHeight);
-        
-        // Let fonts load then adjust
-        setTimeout(adjustHeight, 100);
-        window.addEventListener('resize', adjustHeight);
-        
-        // Handle Tab key
-        textarea.addEventListener('keydown', function(e) {
-            if (e.key == 'Tab') {
-                e.preventDefault();
-                var start = this.selectionStart;
-                var end = this.selectionEnd;
-                this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
-                this.selectionStart = this.selectionEnd = start + 4;
-                updateCode(i);
+# Semantic chunking (splits at topic boundaries)
+kb_sem = Ragi(docs, persist_dir=tmp + "/sem",
+    config={"embedding": {"model": "BAAI/bge-small-en-v1.5"},
+            "chunk": {"strategy": "semantic"}})
+print("semantic:", kb_sem.count(), "chunks")
+
+# Hierarchical chunking (parent-child)
+kb_hier = Ragi(docs, persist_dir=tmp + "/hier",
+    config={"embedding": {"model": "BAAI/bge-small-en-v1.5"},
+            "chunk": {"strategy": "hierarchical"}})
+print("hierarchical:", kb_hier.count(), "chunks")` },
+  { title:'Retrieval', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/auth.md", "w") as f:
+    f.write("Authentication uses JWT tokens. Users send credentials to /auth/login "
+            "and receive a signed token. Include the token in the Authorization header "
+            "for all subsequent API requests. Tokens expire after 24 hours.")
+with open(docs + "/rate.md", "w") as f:
+    f.write("Rate limiting is enforced at 100 requests per minute per API key. "
+            "Exceeding the limit returns HTTP 429. Use exponential backoff to retry. "
+            "Premium tiers support up to 1000 requests per minute.")`,
+    code:`from piragi import Ragi
+
+# Use LLM config from sidebar panel (if configured)
+cfg = {
+    "embedding": {"model": "BAAI/bge-small-en-v1.5"},
+    "retrieval": {
+        "use_hyde": True,            # hypothetical document embeddings
+        "use_hybrid_search": True,   # BM25 + vector search
+    }
+}
+if "_llm_config" in dir() or "_llm_config" in globals():
+    cfg["llm"] = _llm_config
+
+# Enable advanced retrieval features
+kb = Ragi(docs, persist_dir=tmp, config=cfg)
+print("indexed", kb.count(), "chunks")
+
+# HyDE generates a hypothetical answer, then searches for similar real chunks
+results = kb.retrieve("how does authentication work?", top_k=3)
+for r in results:
+    print("--", os.path.basename(r.source), "score:", round(r.score, 3))
+    print(r.chunk[:100])
+    print()` },
+  { title:'Knowledge Graph', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/team.md", "w") as f:
+    f.write("Alice manages the engineering team. Bob reports to Alice and leads "
+            "the backend squad. Carol is a senior engineer who reports to Bob. "
+            "Dave joined recently and works on Project X under Carol.")`,
+    code:`from piragi import Ragi
+
+# Use LLM config from sidebar panel (if configured)
+cfg = {"embedding": {"model": "BAAI/bge-small-en-v1.5"}}
+if "_llm_config" in dir() or "_llm_config" in globals():
+    cfg["llm"] = _llm_config
+
+kb = Ragi(docs, persist_dir=tmp, graph=True, config=cfg)
+
+# Graph extracts entities and relationships during ingestion
+# NOTE: requires an LLM (configure in sidebar LLM Config panel)
+entities = kb.graph.entities()
+triples = kb.graph.triples()
+print("entities:", entities)
+print("triples:", len(triples))
+if triples:
+    for s, p, o in triples[:4]:
+        print(" ", s, "--[" + p + "]-" + "->", o)
+else:
+    print("(no LLM configured -- entity extraction needs Ollama or an API key)")
+    print("(vector retrieval still works below)")
+
+# Graph-augmented retrieval for relationship questions
+results = kb.retrieve("who reports to Alice?")
+print()
+print("query: who reports to Alice?")
+for r in results:
+    print("--", r.chunk[:100])` },
+  { title:'Async', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+for i, name in enumerate(["api.md", "auth.md", "deploy.md"]):
+    with open(docs + "/" + name, "w") as f:
+        f.write(["The API exposes GET /health, POST /ask, and POST /ingest endpoints.",
+                 "Authentication uses JWT tokens with 24h expiry. Include in Authorization header.",
+                 "Deploy with Docker. Set OPENAI_API_KEY env var. Run on port 8080."][i])`,
+    code:`import asyncio, time, sys
+from piragi import AsyncRagi
+
+async def main():
+    t0 = time.time()
+
+    # Async init -- non-blocking indexing
+    kb = AsyncRagi(docs, persist_dir=tmp,
+                   config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
+    print("type:", type(kb).__name__)
+    print("[{:.2f}s] indexed {} chunks".format(time.time()-t0, await kb.count()))
+    sys.stdout.flush()
+
+    # Async retrieve
+    results = await kb.retrieve("how does auth work?")
+    print("[{:.2f}s] retrieved {} results".format(time.time()-t0, len(results)))
+    sys.stdout.flush()
+    for r in results:
+        print("  --", os.path.basename(r.source), "score:", round(r.score, 3))
+        sys.stdout.flush()
+
+    # Async count
+    print("[{:.2f}s] count: {}".format(time.time()-t0, await kb.count()))
+    sys.stdout.flush()
+
+    # List all async methods
+    import inspect
+    async_methods = [m for m in dir(kb)
+                     if not m.startswith("_")
+                     and inspect.iscoroutinefunction(getattr(kb, m))]
+    print()
+    print("async methods:", async_methods)
+    print("total: {:.2f}s".format(time.time()-t0))
+
+asyncio.run(main())` },
+  { title:'Config', lang:'python', code:`from piragi import Ragi
+
+# Full configuration reference
+config = {
+    "llm": {
+        "model": "llama3.2",
+        "base_url": "http://localhost:11434/v1",
+    },
+    "embedding": {
+        "model": "all-mpnet-base-v2",
+        "backend": "onnx",      # 2-5x faster on CPU
+        "batch_size": 32,
+    },
+    "chunk": {
+        "strategy": "semantic",  # fixed, semantic, hierarchical, contextual
+        "size": 512,
+        "overlap": 50,
+    },
+    "retrieval": {
+        "use_hyde": False,
+        "use_hybrid_search": False,
+        "use_cross_encoder": False,
+    },
+    "auto_update": {
+        "enabled": True,
+        "interval": 300,         # seconds
+    },
+}
+
+# Print config structure
+for section, opts in config.items():
+    print(section + ":")
+    for k, v in opts.items():
+        print("  " + k + ":", v)` },
+  { title:'Ask (LLM)', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/stores.md", "w") as f:
+    f.write("piragi supports Lance (default, serverless), "
+            "PostgreSQL with pgvector, Qdrant with TurboQuant, "
+            "Pinecone (managed), and Supabase. "
+            "Configure via store URIs or pass a store object.")`,
+    code:`from piragi import Ragi
+
+# Uses LLM configured in sidebar panel
+llm = _llm_config if '_llm_config' in dir() else {}
+kb = Ragi(docs, persist_dir=tmp, config={
+    "embedding": {"model": "BAAI/bge-small-en-v1.5"},
+    "llm": llm,
+})
+answer = kb.ask("What vector stores are supported?")
+print(answer.text)
+print()
+print("citations:", len(answer.citations))
+for c in answer.citations[:3]:
+    print("  -", os.path.basename(c.source))` }
+];
+
+const simulated = [
+  'indexed 2 chunks\n-- deploy.md\nTo deploy piragi, build a Docker image with your docs baked in. Set OPENAI_API_KEY as an env var. Run the container on port 8080.\n\n-- config.md\npiragi supports Lance, Postgres, Qdrant, and Pinecone as vector stores. Configure via store URIs.',
+  'model: BAAI/bge-small-en-v1.5\ndim: 384\nvec: [0.0234, -0.0891, ...]',
+  'kb1: 56 chunks\nkb2: 12 chunks\nshared embedder: True',
+  'store: QdrantStore\nquantization: scalar (int8)\nchunks: 2\n-- api.md\nThe REST API runs on port 8080. POST /ask with a JSON body containing query and top_k fields.\n-- setup.md\nInstall piragi with pip install piragi[qdrant]. Start Qdrant with docker run.',
+  'fixed: 2 chunks\nsemantic: 3 chunks\nhierarchical: 4 chunks',
+  'indexed 2 chunks\n-- auth.md score: 0.847\nAuthentication uses JWT tokens. Users send credentials to /auth/login and receive a signed token.\n\n-- rate.md score: 0.312\nRate limiting is enforced at 100 requests per minute per API key.',
+  'entities: [\"alice\", \"bob\", \"carol\", \"dave\", \"project x\", \"engineering team\"]\ntriples: 5\n  alice --[manages]--> engineering team\n  bob --[reports_to]--> alice\n  carol --[reports_to]--> bob\n  dave --[works_on]--> project x\n\nquery: who reports to Alice?\n-- Bob reports to Alice and leads the backend squad. Carol is a senior engineer...',
+  'type: AsyncRagi\ncount: 1\n[0.42s] indexed 3 chunks\n[0.58s] retrieved 2 results\n  -- auth.md score: 0.891\n  -- api.md score: 0.412\n[0.59s] count: 3\n\nasync methods: [add, ask, clear, count, filter, graph, refresh, retrieve]\ntotal: 0.61s',
+  'llm:\n  model: llama3.2\n  base_url: http://localhost:11434/v1\nembedding:\n  model: all-mpnet-base-v2\n  backend: onnx\n  batch_size: 32\nchunk:\n  strategy: semantic\n  size: 512\n  overlap: 50\nretrieval:\n  use_hyde: False\n  use_hybrid_search: False\n  use_cross_encoder: False\nauto_update:\n  enabled: True\n  interval: 300',
+  'piragi supports Lance (default, serverless), PostgreSQL with pgvector,\nQdrant with TurboQuant, Pinecone (managed), and Supabase.\n\ncitations: 1\n  - stores.md'
+];
+
+// Per-cell output cache
+const cellOutputs = new Array(cells.length).fill('');
+const cellErrors = new Array(cells.length).fill(false);
+
+let current = 0, backendAlive = false, llmReady = false, forceSimulate = false;
+const API = location.origin;
+
+function toggleSimulation(){
+    forceSimulate = document.getElementById('sim-check').checked;
+    const st = document.getElementById('status-text');
+    if(forceSimulate){
+        st.textContent='simulated';
+        document.getElementById('status-dot').classList.remove('live');
+    } else if(backendAlive){
+        st.textContent='live';
+        document.getElementById('status-dot').classList.add('live');
+    }
+}
+
+fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
+    if(d.status==='ok'){
+        backendAlive=true;
+        document.getElementById('status-dot').classList.add('live');
+        document.getElementById('status-text').textContent='live';
+        document.querySelector('.landing-sub').textContent='zero-config RAG for Python / live';
+        // Populate LLM config from server
+        if(d.llm){
+            const llm=d.llm;
+            if(llm.model) document.getElementById('llm-model').value=llm.model;
+            if(llm.base_url) document.getElementById('llm-url').value=llm.base_url;
+            if(llm.api_key && llm.api_key!=='') document.getElementById('llm-key').value=llm.api_key;
+            if(llm.ollama || llm.base_url){
+                llmReady=true;
+                const st=document.getElementById('llm-status');
+                st.textContent=llm.ollama?`ollama: ${llm.model}`:`LLM: ${llm.model}`;
+                st.className='llm-status llm-ok';
             }
-        });
+        }
+        document.getElementById('file-panel').style.display = 'block';
+        loadFiles('.');
+    }
+}).catch(()=>{
+    document.getElementById('status-text').textContent='simulated';
+    forceSimulate = true;
+    document.querySelector('.sim-toggle').style.display='none';
+    document.getElementById('demo-banner').style.display='block';
+    document.querySelector('.landing-sub').textContent='zero-config RAG for Python / demo';
+});
+
+async function saveLLMConfig(){
+    const cfg={
+        model:document.getElementById('llm-model').value,
+        base_url:document.getElementById('llm-url').value,
+        api_key:document.getElementById('llm-key').value,
+    };
+    try{
+        const res=await fetch(`${API}/api/llm-config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+        const d=await res.json();
+        if(d.ok){
+            llmReady=true;
+            const st=document.getElementById('llm-status');
+            st.textContent=`saved: ${cfg.model}`;
+            st.className='llm-status llm-ok';
+        }
+    }catch(e){
+        const st=document.getElementById('llm-status');
+        st.textContent=`error: ${e.message}`;
+        st.className='llm-status llm-off';
+    }
+}
+
+function enterPlayground(){
+    document.getElementById('landing').classList.add('hidden');
+}
+
+function updateTabDot(i){
+    const tab=document.getElementById(`tab-${i}`);
+    let dot=tab.querySelector('.tab-dot');
+    if(!dot){dot=document.createElement('span');dot.className='tab-dot';tab.appendChild(dot);}
+    dot.className='tab-dot';
+    if(cellErrors[i]) dot.classList.add('has-error');
+    else if(cellOutputs[i]) dot.classList.add('has-output');
+}
+
+// Initialize Ace editor
+const aceEditor = ace.edit('ace-editor');
+window.aceEditor = aceEditor;
+aceEditor.setTheme('ace/theme/tomorrow_night');
+aceEditor.session.setMode('ace/mode/python');
+aceEditor.setOptions({
+    fontSize: '13px',
+    fontFamily: 'var(--mono), monospace',
+    showPrintMargin: false,
+    tabSize: 4,
+    useSoftTabs: true,
+    wrap: false,
+    enableBasicAutocompletion: true,
+    highlightActiveLine: true,
+    showGutter: true,
+});
+// Match playground bg
+aceEditor.container.style.background = '#0d1117';
+aceEditor.renderer.setScrollMargin(8, 8);
+
+// Save on change (guarded during tab switch)
+let switching = false;
+aceEditor.session.on('change', ()=>{
+    if(switching) return;
+    cells[current].code = aceEditor.getValue();
+    localStorage.setItem('piragi-cell-'+current, aceEditor.getValue());
+});
+
+// Ctrl/Cmd+Enter runs cell
+aceEditor.commands.addCommand({
+    name: 'runCell',
+    bindKey: {win: 'Ctrl-Enter', mac: 'Cmd-Enter'},
+    exec: ()=> runCell()
+});
+
+function switchTab(i){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById(`tab-${i}`).classList.add('active');
+    current=i;
+    const c=cells[i];
+    document.getElementById('cell-title').textContent=c.title;
+    document.getElementById('cell-lang').textContent=c.lang;
+    
+    if(!c.origCode) c.origCode = c.code;
+    const saved = localStorage.getItem('piragi-cell-'+i);
+    if(saved !== null) { c.code = saved; }
+    
+    switching = true;
+    aceEditor.setValue(c.code, -1);
+    aceEditor.session.setMode(`ace/mode/${c.lang==='bash'?'sh':c.lang}`);
+    switching = false;
+    
+    // Show/hide data prep panel
+    const dp=document.getElementById('data-prep');
+    const dpc=document.getElementById('data-prep-code');
+    if(c.setup){
+        dp.style.display='block';
+        dpc.textContent=c.setup;
+        Prism.highlightElement(dpc);
+    } else {
+        dp.style.display='none';
+    }
+    // Restore cached output
+    const out=document.getElementById('output');
+    if(cellOutputs[i]){
+        out.innerHTML=cellOutputs[i].replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    } else {
+        out.innerHTML='';
+    }
+    if(typeof updateRunBtn==='function') updateRunBtn();
+}
+
+function resetCellCode(){
+    const c=cells[current];
+    if(c.origCode) c.code = c.origCode;
+    localStorage.removeItem('piragi-cell-'+current);
+    aceEditor.setValue(c.code, -1);
+}
+
+let currentFilePath = '.';
+async function loadFiles(path) {
+    try {
+        const res = await fetch(`${API}/api/files?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        currentFilePath = data.path || path;
+        document.getElementById('file-path').textContent = currentFilePath;
+        const list = document.getElementById('file-list');
+        list.innerHTML = '';
+        if (currentFilePath !== '.' && currentFilePath !== '/') {
+            const up = currentFilePath.split('/').slice(0, -1).join('/') || '/';
+            const div = document.createElement('div');
+            div.className = 'file-entry fe-dir';
+            div.innerHTML = `<span class="fe-name">..</span>`;
+            div.onclick = () => loadFiles(up);
+            list.appendChild(div);
+        }
+        for (const f of (data.entries || [])) {
+            const isDir = f.type === 'dir';
+            const div = document.createElement('div');
+            div.className = `file-entry ${isDir ? 'fe-dir' : 'fe-file'}`;
+            const meta = isDir ? `${f.children || 0} items` : `${((f.size||0)/1024).toFixed(1)} KB`;
+            div.innerHTML = `<span class="fe-name">${f.name}</span><span class="fe-meta">${meta}</span>`;
+            if (isDir) {
+                div.onclick = () => loadFiles(`${currentFilePath}/${f.name}`);
+            }
+            list.appendChild(div);
+        }
+    } catch(e) {}
+}
+
+function insertFilePath() {
+    aceEditor.insert(currentFilePath);
+    aceEditor.focus();
+}
+
+function clearOutput(){document.getElementById('output').innerHTML='';cellOutputs[current]='';cellErrors[current]=false;updateTabDot(current);}
+
+function showOutput(text, cellIndex, isError){
+    cellOutputs[cellIndex]=text;
+    cellErrors[cellIndex]=isError||false;
+    updateTabDot(cellIndex);
+    if(cellIndex===current){
+        const out=document.getElementById('output');
+        out.innerHTML=text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+}
+
+const cellRunning = new Array(cells.length).fill(false);
+
+function updateRunBtn(){
+    const btn=document.getElementById('run-btn');
+    if(cellRunning[current]){
+        btn.disabled=true;btn.classList.add('running');btn.innerHTML='Running...';
+    } else {
+        btn.disabled=false;btn.classList.remove('running');
+        btn.innerHTML='<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+    }
+}
+
+async function execCell(i){
+    if(cellRunning[i]) return; // already running
+    cellRunning[i]=true;
+    const setup=cells[i].setup||'';
+    const code=setup?(setup+'\n'+cells[i].code):cells[i].code;
+    // Mark running dot on tab
+    const tab=document.getElementById(`tab-${i}`);
+    let dot=tab.querySelector('.tab-dot');
+    if(!dot){dot=document.createElement('span');dot.className='tab-dot';tab.appendChild(dot);}
+    dot.className='tab-dot running';
+
+    if(i===current){
+        document.getElementById('output').innerHTML='';
+        updateRunBtn();
+    }
+
+    if(backendAlive && !forceSimulate){
+        let accumulated='';
+        let hasError=false;
+        try{
+            const res=await fetch(`${API}/api/exec-stream`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+            const reader=res.body.getReader();
+            const decoder=new TextDecoder();
+            let buf='';
+            let streamDone=false;
+            while(!streamDone){
+                const {done,value}=await reader.read();
+                if(done) break;
+                buf+=decoder.decode(value,{stream:true});
+                const parts=buf.split('\n\n');
+                buf=parts.pop()||'';
+                for(const part of parts){
+                    if(part.includes('event: done')){streamDone=true;break;}
+                    for(const line of part.split('\n')){
+                        if(line.startsWith('event: error')){hasError=true;}
+                        else if(line.startsWith('data: ')){
+                            try{
+                                const d=JSON.parse(line.slice(6));
+                                if(d.t){
+                                    accumulated+=d.t;
+                                    if(i===current){
+                                        const out=document.getElementById('output');
+                                        out.textContent=accumulated;
+                                        out.scrollTop=out.scrollHeight;
+                                    }
+                                }
+                                if(d.error){accumulated+=d.error;hasError=true;}
+                            }catch(e){}
+                        }
+                    }
+                }
+            }
+        }catch(e){accumulated=`[Error] ${e.message}`;hasError=true;}
+        showOutput(accumulated||'(no output)',i,hasError);
+    } else {
+        showOutput(simulated[i]||'(no output)',i,false);
+    }
+
+    cellRunning[i]=false;
+    if(i===current) updateRunBtn();
+}
+
+function runCell(){
+    execCell(current); // fire-and-forget, no await
+}
+
+switchTab(0);
+
+// Drag to resize output pane
+(function(){
+    const bar=document.getElementById('output-bar');
+    const out=document.getElementById('output');
+    let dragging=false, startY=0, startH=0;
+    bar.addEventListener('mousedown',e=>{
+        if(e.target.closest('.output-clear')) return;
+        dragging=true; startY=e.clientY; startH=out.offsetHeight;
+        document.body.style.cursor='row-resize';
+        e.preventDefault();
     });
-
-    function updateCode(index) {
-        const textarea = document.querySelectorAll('.code-textarea')[index];
-        const codeBlock = document.getElementById(`code-${index}`);
-        
-        codeBlock.textContent = textarea.value;
-        Prism.highlightElement(codeBlock);
-        
-        // Adjust height
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-    }
-
-    function runCell(index) {
-        const btn = document.querySelectorAll('.run-btn')[index];
-        const output = document.getElementById(`out-${index}`);
-        
-        // Disable button during run
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        
-        output.classList.add('visible');
-        output.innerHTML = '<span class="typing-cursor"></span>';
-        
-        const fullText = simulatedOutputs[index];
-        let currentText = '';
-        let charIndex = 0;
-        
-        const typeChar = () => {
-            if (charIndex < fullText.length) {
-                // Type faster for setup cell
-                const charsToType = index === 0 ? 5 : (Math.random() < 0.2 ? 3 : 1);
-                
-                currentText += fullText.substring(charIndex, charIndex + charsToType);
-                charIndex += charsToType;
-                
-                // Escape HTML for safety but keep line breaks
-                const safeText = currentText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                output.innerHTML = safeText + '<span class="typing-cursor"></span>';
-                
-                setTimeout(typeChar, index === 0 ? 10 : 20 + Math.random() * 30);
-            } else {
-                output.innerHTML = currentText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            }
-        };
-        
-        // Small delay before starting to simulate network/processing
-        setTimeout(typeChar, 300);
-    }
+    document.addEventListener('mousemove',e=>{
+        if(!dragging) return;
+        const h=Math.max(60, startH-(e.clientY-startY));
+        out.style.height=h+'px';
+    });
+    document.addEventListener('mouseup',()=>{
+        if(dragging){dragging=false;document.body.style.cursor='';}
+    });
+})();
 </script>
-
 </body>
 </html>

@@ -37,7 +37,7 @@ from .types import Answer, Citation
 
 # Advanced components (optional imports)
 from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
-from .hybrid_search import BM25, HybridSearcher
+from .hybrid_search import HybridSearcher
 from .query_transform import HyDE, QueryExpander, MultiQueryRetriever, StepBackPrompting
 from .semantic_chunking import (
     SemanticChunker,
@@ -53,7 +53,7 @@ from .stores import (
     QdrantStore,
 )
 
-__version__ = "0.8.0"
+__version__ = "1.0.0"
 __all__ = [
     # Core
     "Ragi",
@@ -72,7 +72,6 @@ __all__ = [
     "TFIDFReranker",
     "HybridReranker",
     # Hybrid search
-    "BM25",
     "HybridSearcher",
     # Query transformation
     "HyDE",

@@ -1,7 +1,7 @@
 """Tests for hybrid search (BM25 + vector) functionality."""
 
 import pytest
-from piragi.hybrid_search import BM25, HybridSearcher, create_hybrid_searcher
+from piragi.hybrid_search import HybridSearcher, create_hybrid_searcher
 from piragi.types import Citation
 
 
@@ -30,105 +30,6 @@ def sample_citations(sample_corpus):
         )
         for i, text in enumerate(sample_corpus)
     ]
-
-
-class TestBM25:
-    """Tests for BM25 implementation."""
-
-    def test_init_defaults(self):
-        """Test BM25 initialization with defaults."""
-        bm25 = BM25()
-        assert bm25.k1 == 1.5
-        assert bm25.b == 0.75
-
-    def test_init_custom_params(self):
-        """Test BM25 with custom parameters."""
-        bm25 = BM25(k1=2.0, b=0.5)
-        assert bm25.k1 == 2.0
-        assert bm25.b == 0.5
-
-    def test_fit_empty_corpus(self):
-        """Test fitting on empty corpus."""
-        bm25 = BM25()
-        bm25.fit([])
-        assert bm25._corpus_size == 0
-
-    def test_fit_corpus(self, sample_corpus):
-        """Test fitting on sample corpus."""
-        bm25 = BM25()
-        bm25.fit(sample_corpus)
-
-        assert bm25._corpus_size == len(sample_corpus)
-        assert bm25._avgdl > 0
-        assert len(bm25._tokenized_corpus) == len(sample_corpus)
-
-    def test_score_empty_corpus(self):
-        """Test scoring with empty corpus."""
-        bm25 = BM25()
-        bm25.fit([])
-        scores = bm25.score("test query")
-        assert scores == []
-
-    def test_score_single_doc(self):
-        """Test scoring with single document."""
-        bm25 = BM25()
-        bm25.fit(["Python is a programming language"])
-        scores = bm25.score("Python")
-
-        assert len(scores) == 1
-        assert scores[0] > 0  # Should have positive score
-
-    def test_score_multiple_docs(self, sample_corpus):
-        """Test scoring multiple documents."""
-        bm25 = BM25()
-        bm25.fit(sample_corpus)
-        scores = bm25.score("Python programming")
-
-        assert len(scores) == len(sample_corpus)
-        # Python docs should score higher
-        python_indices = [0, 3]  # Indices of Python docs
-        max_score_idx = scores.index(max(scores))
-        assert max_score_idx in python_indices
-
-    def test_score_no_match(self, sample_corpus):
-        """Test scoring when query has no matches."""
-        bm25 = BM25()
-        bm25.fit(sample_corpus)
-        scores = bm25.score("xyznonexistent")
-
-        # All scores should be 0 or very low
-        assert all(s == 0 for s in scores)
-
-    def test_get_top_k(self, sample_corpus):
-        """Test getting top-k results."""
-        bm25 = BM25()
-        bm25.fit(sample_corpus)
-        results = bm25.get_top_k("Python language", k=2)
-
-        assert len(results) == 2
-        # Results should be (index, score) tuples
-        assert all(isinstance(r, tuple) and len(r) == 2 for r in results)
-        # Scores should be descending
-        assert results[0][1] >= results[1][1]
-
-    def test_get_top_k_more_than_corpus(self, sample_corpus):
-        """Test requesting more results than corpus size."""
-        bm25 = BM25()
-        bm25.fit(sample_corpus)
-        results = bm25.get_top_k("Python", k=100)
-
-        assert len(results) == len(sample_corpus)
-
-    def test_tokenization(self):
-        """Test internal tokenization."""
-        bm25 = BM25()
-        tokens = bm25._tokenize("Hello World! This is a TEST.")
-
-        assert "hello" in tokens
-        assert "world" in tokens
-        assert "test" in tokens
-        # Single char tokens should be filtered
-        assert "a" not in tokens
 
 
 class TestHybridSearcher:

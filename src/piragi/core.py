@@ -322,6 +322,8 @@ class Ragi:
         def _progress(msg: str) -> None:
             if on_progress:
                 on_progress(msg)
+            else:
+                print("[piragi]", msg)
 
         # Load documents
         _progress("Discovering files...")
@@ -374,7 +376,7 @@ class Ragi:
             for chunk in chunks_with_embeddings:
                 self._graph.extract_and_add(
                     text=chunk.text,
-                    llm_client=self.retriever._client,
+                    llm_client=self.retriever.client,
                     model=llm_cfg.get("model", "llama3.2"),
                 )
             self._graph.save()

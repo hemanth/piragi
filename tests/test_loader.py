@@ -112,10 +112,12 @@ def test_remote_schemes_defined():
     assert "abfs" in REMOTE_SCHEMES
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_single_file(mock_fsspec, tmp_path):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_single_file(mock_get_fsspec, tmp_path):
     """Test loading a single file from remote filesystem."""
     # Create a mock filesystem
+    mock_fsspec = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fs = MagicMock()
     mock_fsspec.filesystem.return_value = mock_fs
 
@@ -144,9 +146,11 @@ def test_load_remote_single_file(mock_fsspec, tmp_path):
     mock_fsspec.filesystem.assert_called_with("s3")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_glob_pattern(mock_fsspec, tmp_path):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_glob_pattern(mock_get_fsspec, tmp_path):
     """Test loading files with glob pattern from remote filesystem."""
+    mock_fsspec = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fs = MagicMock()
     mock_fsspec.filesystem.return_value = mock_fs
 
@@ -168,9 +172,11 @@ def test_load_remote_glob_pattern(mock_fsspec, tmp_path):
     mock_fs.glob.assert_called_with("bucket/docs/*.txt")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_missing_dependency(mock_fsspec):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_missing_dependency(mock_get_fsspec):
     """Test helpful error message when remote FS dependency is missing."""
+    mock_fsspec = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fsspec.filesystem.side_effect = ImportError("No module named 's3fs'")
 
     loader = DocumentLoader()
@@ -179,9 +185,11 @@ def test_load_remote_missing_dependency(mock_fsspec):
         loader._load_remote("s3://bucket/file.txt")
 
 
-@patch("piragi.loader.fsspec")
-def test_load_remote_no_files_found(mock_fsspec):
+@patch("piragi.loader._get_fsspec")
+def test_load_remote_no_files_found(mock_get_fsspec):
     """Test error when no files match remote glob pattern."""
+    mock_fsspec = MagicMock()
+    mock_get_fsspec.return_value = mock_fsspec
     mock_fs = MagicMock()
     mock_fsspec.filesystem.return_value = mock_fs
     mock_fs.glob.return_value = []

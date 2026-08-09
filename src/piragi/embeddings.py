@@ -1,10 +1,19 @@
 """Embedding generation using local or remote models."""
 
 import os
+import logging
+import time
 from typing import Callable, List, Optional
 
 from .types import Chunk
 
+from collections import OrderedDict
+
+logger = logging.getLogger(__name__)
+
+# Module-level cache for SentenceTransformer models (keyed by model+backend)
+_MODEL_CACHE_MAX = 3
+_model_cache = OrderedDict()
 
 class EmbeddingGenerator:
     """Generate embeddings using local sentence-transformers or remote API."""
@@ -45,20 +54,34 @@ class EmbeddingGenerator:
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             self.model = None
         else:
-            # Use local sentence-transformers
-            from sentence_transformers import SentenceTransformer
+            # Use local sentence-transformers (with cache)
+            cache_key = (model, backend)
+            if cache_key in _model_cache:
+                _model_cache.move_to_end(cache_key)
+                self.model = _model_cache[cache_key]
+                print("[piragi] model '{}' loaded from cache".format(model))
+            else:
+                from sentence_transformers import SentenceTransformer
 
-            kwargs = {
-                "trust_remote_code": True,
-                "device": device,
-            }
-            if self.backend is not None:
-                kwargs["backend"] = self.backend
+                print("[piragi] loading model '{}'...".format(model))
+                t0 = time.time()
+                kwargs = {
+                    "trust_remote_code": True,
+                    "device": device,
+                }
+                if self.backend is not None:
+                    kwargs["backend"] = self.backend
 
-            self.model = SentenceTransformer(
-                model,
-                **kwargs
-            )
+                self.model = SentenceTransformer(
+                    model,
+                    **kwargs
+                )
+                _model_cache[cache_key] = self.model
+                if len(_model_cache) > _MODEL_CACHE_MAX:
+                    evicted_key, evicted_model = _model_cache.popitem(last=False)
+                    del evicted_model  # free memory
+                    logger.info("Evicted model '%s' from cache (max %d)", evicted_key[0], _MODEL_CACHE_MAX)
+                print("[piragi] model loaded in {:.1f}s".format(time.time() - t0))
             self.client = None
 
     def embed_chunks(

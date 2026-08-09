@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-08-09
+
+### Changed
+- Default embedding model upgraded from `all-MiniLM-L6-v2` to `BAAI/bge-small-en-v1.5` (better quality, same 384 dims)
+- BM25 keyword search replaced with `rank_bm25.BM25Okapi` for O(1) scoring (was O(n))
+- Async polling in `AsyncRagi` replaced with `asyncio.Queue` (no more busy-wait CPU burn)
+- Semantic chunking similarity calculation vectorized with NumPy (was Python for-loop)
+- Reranker upgraded from naive keyword overlap to TF-IDF with sklearn fallback
+- Updater shutdown now instant via `threading.Event` (was 10s `time.sleep` block)
+
+### Fixed
+- Loader silently swallowed file errors (`except: pass`) — now logs warnings
+- Embedding dimension auto-detected from model probe (was hardcoded dict, crashed on unknown models)
+- Knowledge graph search used naive substring matching — now uses fuzzy matching with `SequenceMatcher`
+- Entity resolution normalized to Title Case for consistent graph traversal
+- Model cache grew unbounded — now LRU-evicted at 3 models with logging
+- Remote loader test mocks updated for lazy fsspec import pattern
+
+### Added
+- `rank-bm25>=0.2.2` to core dependencies
+- Interactive playground with GH Pages demo mode (`piragi playground`)
+- Playground server with file browser and code save APIs
+- `BAAI/bge-small-en-v1.5` dimension entry in store lookups
+
 ## [0.8.0] - 2026-07-07
 
 ### Added
@@ -159,6 +183,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Metadata filtering
 - Auto-updates with background workers
 
+[1.0.0]: https://github.com/hemanth/piragi/releases/tag/v1.0.0
 [0.8.0]: https://github.com/hemanth/piragi/releases/tag/v0.8.0
 [0.7.9]: https://github.com/hemanth/piragi/releases/tag/v0.7.9
 [0.7.5]: https://github.com/hemanth/piragi/releases/tag/v0.7.5

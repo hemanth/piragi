@@ -191,7 +191,7 @@ config = {
         "base_url": "http://localhost:11434/v1"
     },
     "embedding": {
-        "model": "all-mpnet-base-v2",
+        "model": "BAAI/bge-small-en-v1.5",
         "batch_size": 32
     },
     "chunk": {
@@ -281,6 +281,17 @@ await kb.ask(query, top_k=5)
 ```
 
 Full docs: [API.md](API.md)
+
+## Playground
+
+Interactive playground with zero setup — works in demo mode on [GitHub Pages](https://hemanth.github.io/piragi/) or live with a local backend:
+
+```bash
+pip install piragi
+piragi playground
+```
+
+Features: multi-cell code editor, simulated outputs, LLM config, file browser.
 
 ## License
 

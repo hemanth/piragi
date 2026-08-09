@@ -20,7 +20,7 @@ class SemanticChunker:
 
     def __init__(
         self,
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str = "BAAI/bge-small-en-v1.5",
         similarity_threshold: float = 0.5,
         min_chunk_size: int = 100,
         max_chunk_size: int = 2000,
@@ -93,14 +93,12 @@ class SemanticChunker:
         # Compute cosine similarity between adjacent pairs
         import numpy as np
 
-        similarities = []
-        for i in range(len(embeddings) - 1):
-            sim = np.dot(embeddings[i], embeddings[i + 1]) / (
-                np.linalg.norm(embeddings[i]) * np.linalg.norm(embeddings[i + 1])
-            )
-            similarities.append(float(sim))
-
-        return similarities
+        a = embeddings[:-1]
+        b = embeddings[1:]
+        sims = np.sum(a * b, axis=1) / (
+            np.linalg.norm(a, axis=1) * np.linalg.norm(b, axis=1)
+        )
+        return [float(s) for s in sims]
 
     def _find_split_points(
         self,

@@ -73,7 +73,7 @@ class TestGetEmbeddingDimension:
 
     def test_unknown_model(self):
         """Test dimension lookup for unknown model returns default."""
-        assert get_embedding_dimension("unknown-model-xyz") == 768
+        assert get_embedding_dimension("unknown-model-xyz") == 384
 
 
 class TestVectorStoreInit:

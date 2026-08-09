@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "piragi"
-version = "0.8.0"
+version = "1.0.0"
 description = "The best RAG interface yet - Built-in vector store, embeddings, citations, and auto-updates"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,6 +36,7 @@ dependencies = [
     "scikit-learn>=1.0.0",
     "pyarrow>=14.0.0",
     "pysbd>=0.3.4",
+    "rank-bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]

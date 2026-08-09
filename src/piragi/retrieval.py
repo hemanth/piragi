@@ -103,19 +103,24 @@ Return only the alternatives, one per line, without numbering or explanation."""
         if not self.enable_reranking or len(citations) <= 1:
             return citations
 
-        # Simple keyword-based reranking
-        query_terms = set(query.lower().split())
+        try:
+            from .reranker import TFIDFReranker
+            reranker = TFIDFReranker()
+            return reranker.rerank(query, citations)
+        except ImportError:
+            # Simple keyword-based reranking fallback
+            query_terms = set(query.lower().split())
 
-        def relevance_score(citation: Citation) -> float:
-            chunk_terms = set(citation.chunk.lower().split())
-            # Combine original vector score with keyword overlap
-            keyword_overlap = len(query_terms & chunk_terms) / max(len(query_terms), 1)
-            # Weight: 70% vector similarity, 30% keyword overlap
-            return 0.7 * citation.score + 0.3 * keyword_overlap
+            def relevance_score(citation: Citation) -> float:
+                chunk_terms = set(citation.chunk.lower().split())
+                # Combine original vector score with keyword overlap
+                keyword_overlap = len(query_terms & chunk_terms) / max(len(query_terms), 1)
+                # Weight: 70% vector similarity, 30% keyword overlap
+                return 0.7 * citation.score + 0.3 * keyword_overlap
 
-        # Rerank by combined score
-        reranked = sorted(citations, key=relevance_score, reverse=True)
-        return reranked
+            # Rerank by combined score
+            reranked = sorted(citations, key=relevance_score, reverse=True)
+            return reranked
 
     def generate_answer(
         self,

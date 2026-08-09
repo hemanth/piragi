@@ -129,6 +129,11 @@ def main():
     index_parser = subparsers.add_parser("index", help="Index documents")
     index_parser.add_argument("source", help="Document source")
     
+    # playground command
+    play_parser = subparsers.add_parser("playground", help="Start interactive web playground")
+    play_parser.add_argument("--port", type=int, default=8787, help="Server port (default: 8787)")
+    play_parser.add_argument("--no-browser", action="store_true", help="Don't open browser")
+    
     args = parser.parse_args()
     
     if args.command == "repl":
@@ -137,6 +142,9 @@ def main():
         one_shot_ask(args)
     elif args.command == "index":
         index_docs(args)
+    elif args.command == "playground":
+        from piragi.playground_server import start_server
+        start_server(port=args.port, open_browser=not args.no_browser)
     elif args.command is None:
         repl()
     else:

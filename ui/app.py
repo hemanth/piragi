@@ -82,7 +82,7 @@ def get_kb_config():
             "api_key": "ollama",
         },
         "embedding": {
-            "model": st.session_state.get("embed_model", "all-MiniLM-L6-v2"),
+            "model": st.session_state.get("embed_model", "BAAI/bge-small-en-v1.5"),
         },
         "chunk": chunk_cfg,
         "retrieval": {
