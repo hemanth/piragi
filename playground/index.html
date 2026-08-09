@@ -558,6 +558,42 @@ for section, opts in config.items():
     print(section + ":")
     for k, v in opts.items():
         print("  " + k + ":", v)` },
+  { title:'Remote FS', lang:'python', code:`from piragi import Ragi
+
+# S3 — read PDFs from a bucket
+kb = Ragi("s3://my-bucket/docs/**/*.pdf")
+
+# Google Cloud Storage
+kb = Ragi("gs://my-bucket/reports/*.md")
+
+# Azure Blob Storage
+kb = Ragi("az://my-container/files/*.txt")
+
+# Mix local + remote + web
+kb = Ragi([
+    "./local-docs",
+    "s3://bucket/remote/**/*.pdf",
+    "https://example.com/api-docs",
+])
+
+# Recursive web crawling (same-domain, depth 3)
+kb = Ragi("https://docs.example.com/**")
+
+print("Remote filesystem schemes:")
+from piragi.loader import REMOTE_SCHEMES
+for scheme in sorted(REMOTE_SCHEMES):
+    print(" ", scheme)`,
+    simulated:[
+      "Remote filesystem schemes:",
+      "  abfs",
+      "  az",
+      "  gcs",
+      "  gs",
+      "  hdfs",
+      "  s3",
+      "  s3a",
+      "  sftp",
+    ] },
   { title:'Ask (LLM)', lang:'python',
     setup:`import tempfile, os
 tmp = tempfile.mkdtemp()
