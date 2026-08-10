@@ -251,6 +251,8 @@
         <div class="tab" onclick="switchTab(7)" id="tab-7"><span class="tab-icon">8</span><span>Async</span></div>
         <div class="tab" onclick="switchTab(8)" id="tab-8"><span class="tab-icon">9</span><span>Config</span></div>
         <div class="tab" onclick="switchTab(9)" id="tab-9"><span class="tab-icon">10</span><span>Ask (LLM)</span></div>
+        <div class="tab" onclick="switchTab(10)" id="tab-10"><span class="tab-icon">11</span><span>Pipelines</span></div>
+        <div class="tab" onclick="switchTab(11)" id="tab-11"><span class="tab-icon">12</span><span>Filter & LLM</span></div>
         <details class="file-panel" id="file-panel" style="display:none">
             <summary>Files</summary>
             <div class="file-breadcrumb" id="file-path">~</div>
@@ -617,7 +619,53 @@ print(answer.text)
 print()
 print("citations:", len(answer.citations))
 for c in answer.citations[:3]:
-    print("  -", os.path.basename(c.source))` }
+    print("  -", os.path.basename(c.source))` },
+  { title:'Pipelines', lang:'python', code:`from piragi import RagiConfig
+from piragi.pipelines import IngestionPipeline, RetrievalPipeline
+
+# 1. Type-safe config
+config = RagiConfig(
+    embedding={"model": "BAAI/bge-small-en-v1.5"},
+    retrieval={"use_hyde": False}
+)
+
+# 2. Composable Ingestion Pipeline
+print("Initializing IngestionPipeline...")
+ingest = IngestionPipeline(embedder=config.get_embedder(), store=config.get_store())
+
+# 3. Composable Retrieval Pipeline (Parallel search)
+retrieve = RetrievalPipeline(
+    store=config.get_store(), 
+    llm=config.get_llm(),
+    max_parallel_queries=4
+)
+print("Pipeline initialized ready for parallel multi-query search.")` },
+  { title:'Filter & LLM', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/a.txt", "w") as f:
+    f.write("A-side docs")
+with open(docs + "/b.txt", "w") as f:
+    f.write("B-side docs")`,
+    code:`from piragi import Ragi, LLMClient
+
+# Standalone unified client with connection pooling
+llm_cfg = _llm_config if '_llm_config' in dir() else {}
+client = LLMClient(**llm_cfg)
+
+print("LLM Client test:")
+print(client.generate("Say hello in one word!"))
+
+# Thread-safe filtering returns an immutable FilteredRagi view
+kb = Ragi(docs, config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
+
+# .filter() returns a new thread-safe instance
+kb_api = kb.filter(type="api")
+print("\\nThread-safe instances:")
+print("Base:", type(kb).__name__)
+print("Filtered:", type(kb_api).__name__)` }
 ];
 
 const simulated = [
@@ -630,7 +678,9 @@ const simulated = [
   'entities: [\"alice\", \"bob\", \"carol\", \"dave\", \"project x\", \"engineering team\"]\ntriples: 5\n  alice --[manages]--> engineering team\n  bob --[reports_to]--> alice\n  carol --[reports_to]--> bob\n  dave --[works_on]--> project x\n\nquery: who reports to Alice?\n-- Bob reports to Alice and leads the backend squad. Carol is a senior engineer...',
   'type: AsyncRagi\ncount: 1\n[0.42s] indexed 3 chunks\n[0.58s] retrieved 2 results\n  -- auth.md score: 0.891\n  -- api.md score: 0.412\n[0.59s] count: 3\n\nasync methods: [add, ask, clear, count, filter, graph, refresh, retrieve]\ntotal: 0.61s',
   'llm:\n  model: llama3.2\n  base_url: http://localhost:11434/v1\nembedding:\n  model: all-mpnet-base-v2\n  backend: onnx\n  batch_size: 32\nchunk:\n  strategy: semantic\n  size: 512\n  overlap: 50\nretrieval:\n  use_hyde: False\n  use_hybrid_search: False\n  use_cross_encoder: False\nauto_update:\n  enabled: True\n  interval: 300',
-  'piragi supports Lance (default, serverless), PostgreSQL with pgvector,\nQdrant with TurboQuant, Pinecone (managed), and Supabase.\n\ncitations: 1\n  - stores.md'
+  'piragi supports Lance (default, serverless), PostgreSQL with pgvector,\nQdrant with TurboQuant, Pinecone (managed), and Supabase.\n\ncitations: 1\n  - stores.md',
+  'Initializing IngestionPipeline...\nPipeline initialized ready for parallel multi-query search.',
+  'LLM Client test:\nHello!\n\nThread-safe instances:\nBase: Ragi\nFiltered: FilteredRagi'
 ];
 
 // Per-cell output cache

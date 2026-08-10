@@ -185,31 +185,14 @@ Requires: `pip install piragi[graph]`
 ## Configuration
 
 ```python
-config = {
-    "llm": {
-        "model": "llama3.2",
-        "base_url": "http://localhost:11434/v1"
-    },
-    "embedding": {
-        "model": "BAAI/bge-small-en-v1.5",
-        "batch_size": 32
-    },
-    "chunk": {
-        "strategy": "fixed",
-        "size": 512,
-        "overlap": 50
-    },
-    "retrieval": {
-        "use_hyde": False,
-        "use_hybrid_search": False,
-        "use_cross_encoder": False
-    },
-    "auto_update": {
-        "enabled": True,
-        "interval": 300
-    }
-}
+from piragi import Ragi, RagiConfig
+
+# Pydantic validation catches typos and invalid types
+config = RagiConfig(llm={"model": "gpt-4", "api_key": "sk-..."})
+kb = Ragi("./docs", config=config)
 ```
+
+Configuration supports typed fields and automatic validation.
 
 ## Async Support
 
@@ -261,6 +244,34 @@ context = "\n".join(c.chunk for c in chunks)
 response = your_llm(f"Context:\n{context}\n\nQuestion: {query}")
 ```
 
+## LLM Client
+
+```python
+from piragi import LLMClient
+
+# Standalone unified client with connection pooling and backoff retries
+client = LLMClient(model="gpt-4", api_key="sk-...")
+response = client.generate("Hello!")
+```
+
+## Pipelines & Advanced API
+
+```python
+from piragi.pipelines import IngestionPipeline, RetrievalPipeline
+from piragi.loader import DocumentLoader
+
+# Composable pipelines for power users
+ingest = IngestionPipeline(store=store, embedder=embedder)
+# Memory-efficient streaming loader for large corpora
+ingest.run(DocumentLoader.stream("./large-corpora/**/*.pdf")) 
+
+# Parallel multi-query search via ThreadPoolExecutor
+retrieve = RetrievalPipeline(store=store, llm=llm, max_parallel_queries=4)
+retrieve.run("What is X?") 
+```
+
+Pipelines offer fine-grained control over ingestion and parallelized retrieval.
+
 ## API
 
 ```python
@@ -269,7 +280,7 @@ kb = Ragi(sources, persist_dir=".piragi", config=None, store=None, graph=False)
 kb.add("./more-docs")
 kb.ask(query, top_k=5)
 kb.retrieve(query, top_k=5)
-kb.filter(**metadata).ask(query)
+kb.filter(**metadata).ask(query)  # Thread-safe filtering returns FilteredRagi
 kb.refresh("./docs")
 kb.count()
 kb.clear()
