@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-08-10
+
+### Added
+- `LLMClient` — Unified LLM client with connection pooling and retry logic
+- `IngestionPipeline` — Composable pipeline: Load → Chunk → Embed → Store
+- `RetrievalPipeline` — Composable pipeline: Transform → Search → Rerank → Generate
+- `DocumentLoader.stream()` — Memory-efficient generator for large corpora
+- `pipelines/` package with standalone pipeline classes for power users
+
+### Changed
+- `Ragi` is now a thin facade delegating to `IngestionPipeline` and `RetrievalPipeline`
+- `Ragi.add()` uses streaming ingestion (doc-by-doc) instead of loading all into memory
+- All LLM calls go through a single shared `LLMClient` instance (connection pooling)
+- Retriever, HyDE, ContextualChunker now accept `llm_client` parameter
+
+### Architecture
+- **God class decomposition:** `Ragi` core.py reduced from ~800 LOC to ~350 LOC
+- **Pipeline pattern:** Each pipeline is independently testable and composable
+- **Backward compatible:** `kb = Ragi("./docs"); kb.ask("query")` unchanged
+
 ## [1.1.0] - 2026-08-09
 
 ### Added

@@ -24,6 +24,7 @@ class Retriever:
         temperature: float = 0.1,
         enable_reranking: bool = True,
         enable_query_expansion: bool = True,
+        llm_client = None,
     ) -> None:
         """
         Initialize the retriever.
@@ -36,23 +37,29 @@ class Retriever:
             enable_reranking: Enable reranking of results (default: True)
             enable_query_expansion: Enable query expansion for better retrieval (default: True)
         """
-        self.model = model
-        self.temperature = temperature
         self.enable_reranking = enable_reranking
         self.enable_query_expansion = enable_query_expansion
 
-        # Default to Ollama if no base_url provided
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-
-        # API key is optional for local models
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-        )
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.temperature = llm_client.temperature
+            self.client = llm_client.client
+        else:
+            self.model = model
+            self.temperature = temperature
+            
+            # Default to Ollama if no base_url provided
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+    
+            # API key is optional for local models
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+            
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url, temperature=temperature)
+            self.client = self.llm_client.client
 
     def expand_query(self, query: str) -> List[str]:
         """
@@ -73,18 +80,14 @@ class Retriever:
 Generate 2 alternative phrasings that preserve the same meaning but use different words.
 Return only the alternatives, one per line, without numbering or explanation."""
 
-            @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
-            def do_request():
-                return self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant that rephrases questions."},
-                        {"role": "user", "content": expansion_prompt},
-                    ],
-                    temperature=0.7,
-                    max_tokens=100,
-                )
-            response = do_request()
+            response = self.llm_client.complete(
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that rephrases questions."},
+                    {"role": "user", "content": expansion_prompt},
+                ],
+                temperature=0.7,
+                max_tokens=100,
+            )
 
             alternatives = response.choices[0].message.content or ""
             variations = [query] + [line.strip() for line in alternatives.split('\n') if line.strip()]
@@ -202,17 +205,12 @@ Question: {query}
 Please answer the question based on the context provided above. Cite your sources."""
 
         try:
-            @retry_with_backoff(exceptions=(ConnectionError, TimeoutError, openai.APIConnectionError, openai.APITimeoutError))
-            def do_request():
-                return self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=self.temperature,
-                )
-            response = do_request()
+            response = self.llm_client.complete(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+            )
 
             return response.choices[0].message.content or ""
 

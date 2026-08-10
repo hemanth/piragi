@@ -28,6 +28,7 @@ class HyDE:
         num_hypothetical: int = 1,
         temperature: float = 0.7,
         max_tokens: int = 256,
+        llm_client = None,
     ) -> None:
         """
         Initialize HyDE.
@@ -42,18 +43,25 @@ class HyDE:
         """
         import os
 
-        self.model = model
         self.num_hypothetical = num_hypothetical
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-        # Default to Ollama
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            # Default to Ollama
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+    
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
 
     def generate_hypothetical_document(self, query: str) -> str:
         """
@@ -74,8 +82,7 @@ Write the passage as if it's from an authoritative source document. Include spec
 Passage:"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm_client.complete(
                 messages=[
                     {
                         "role": "system",
@@ -142,6 +149,7 @@ class QueryExpander:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         num_expansions: int = 2,
+        llm_client = None,
     ) -> None:
         """
         Initialize query expander.
@@ -154,15 +162,22 @@ class QueryExpander:
         """
         import os
 
-        self.model = model
         self.num_expansions = num_expansions
 
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+    
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
 
     def expand(self, query: str) -> List[str]:
         """
@@ -180,8 +195,7 @@ Generate {self.num_expansions} alternative phrasings that preserve the same mean
 Return only the alternatives, one per line, without numbering or explanation."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm_client.complete(
                 messages=[
                     {
                         "role": "system",
@@ -226,6 +240,7 @@ class MultiQueryRetriever:
         use_hyde: bool = True,
         use_expansion: bool = True,
         num_expansions: int = 2,
+        llm_client = None,
     ) -> None:
         """
         Initialize multi-query retriever.
@@ -240,9 +255,15 @@ class MultiQueryRetriever:
         """
         self.use_hyde = use_hyde
         self.use_expansion = use_expansion
+        self.llm_client = llm_client
 
         if use_hyde:
-            self.hyde = HyDE(model=model, api_key=api_key, base_url=base_url)
+            self.hyde = HyDE(
+                model=model, 
+                api_key=api_key, 
+                base_url=base_url,
+                llm_client=llm_client
+            )
         else:
             self.hyde = None
 
@@ -252,6 +273,7 @@ class MultiQueryRetriever:
                 api_key=api_key,
                 base_url=base_url,
                 num_expansions=num_expansions,
+                llm_client=llm_client
             )
         else:
             self.expander = None
@@ -304,18 +326,25 @@ class StepBackPrompting:
         model: str = "llama3.2",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        llm_client = None,
     ) -> None:
         """Initialize step-back prompting."""
         import os
 
-        self.model = model
-
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+    
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
 
     def generate_stepback_query(self, query: str) -> str:
         """
@@ -343,8 +372,7 @@ Now generate a general question for the given specific question. Return only the
 General question:"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm_client.complete(
                 messages=[
                     {
                         "role": "system",

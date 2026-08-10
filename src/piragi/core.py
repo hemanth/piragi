@@ -158,6 +158,14 @@ class Ragi:
         # Store config for later use
         self._config = cfg
 
+        from .llm_client import LLMClient
+        self.llm_client = LLMClient(
+            model=self.config.llm.model,
+            api_key=self.config.llm.api_key,
+            base_url=self.config.llm.base_url,
+            temperature=self.config.llm.temperature,
+        )
+
         # Initialize components
         self.loader = DocumentLoader()
 
@@ -174,9 +182,7 @@ class Ragi:
         elif chunk_strategy == "contextual":
             from .semantic_chunking import ContextualChunker
             self.chunker = ContextualChunker(
-                model=self.config.llm.model,
-                api_key=self.config.llm.api_key,
-                base_url=self.config.llm.base_url,
+                llm_client=self.llm_client,
             )
         elif chunk_strategy == "hierarchical":
             from .semantic_chunking import HierarchicalChunker
@@ -231,9 +237,7 @@ class Ragi:
         if self._use_hyde:
             from .query_transform import HyDE
             self._hyde = HyDE(
-                model=self.config.llm.model,
-                api_key=self.config.llm.api_key,
-                base_url=self.config.llm.base_url,
+                llm_client=self.llm_client,
             )
 
         if self._use_hybrid_search:
@@ -254,10 +258,7 @@ class Ragi:
 
         # LLM / Basic retriever
         self.retriever = Retriever(
-            model=self.config.llm.model,
-            api_key=self.config.llm.api_key,
-            base_url=self.config.llm.base_url,
-            temperature=self.config.llm.temperature,
+            llm_client=self.llm_client,
             enable_reranking=self.config.llm.enable_reranking and not self._use_cross_encoder,
             enable_query_expansion=self.config.llm.enable_query_expansion and not self._use_hyde,
         )
@@ -297,6 +298,18 @@ class Ragi:
             graph_path = os.path.join(persist_dir, "graph.json")
             self._graph = KnowledgeGraph(persist_path=graph_path)
 
+        from .pipelines.retrieval import RetrievalPipeline
+        self._retrieval_pipeline = RetrievalPipeline(
+            embedder=self.embedder,
+            store=self.store,
+            retriever=self.retriever,
+            hyde=self._hyde,
+            hybrid_searcher=self._hybrid_searcher,
+            cross_encoder=self._cross_encoder,
+            graph=self._graph,
+            use_hierarchical=self._use_hierarchical,
+        )
+
         # Load initial sources if provided
         if sources:
             self.add(sources)
@@ -317,87 +330,65 @@ class Ragi:
         Returns:
             Self for chaining
         """
+        # We need to wrap post_load_hook to do auto update
+        user_hook = self._post_load_hook
+        def auto_update_hook(docs):
+            if user_hook:
+                docs = user_hook(docs)
+                if not docs:
+                    return docs
+            
+            if self._auto_update_enabled and self._updater:
+                for doc in docs:
+                    self._tracked_sources[doc.source] = doc
+                    # Register with updater
+                    if ChangeDetector.is_url(doc.source):
+                        metadata = ChangeDetector.get_url_metadata(doc.source, doc.content)
+                    else:
+                        metadata = ChangeDetector.get_file_metadata(doc.source, doc.content)
+                    self._updater.register_source(
+                        doc.source, doc.content, check_interval=None
+                    )
+            return docs
+
+        from .pipelines.ingestion import IngestionPipeline
+        pipeline = IngestionPipeline(
+            loader=self.loader,
+            chunker=self.chunker,
+            embedder=self.embedder,
+            store=self.store,
+            graph=self._graph if self._use_graph else None,
+            hybrid_searcher=self._hybrid_searcher if self._use_hybrid_search else None,
+            post_load_hook=auto_update_hook,
+            post_chunk_hook=self._post_chunk_hook,
+            post_embed_hook=self._post_embed_hook,
+            use_hierarchical=self._use_hierarchical,
+        )
+        
+        # Determine the llm_client to pass for graph extraction
+        llm_client = None
+        if self._use_graph and self._graph:
+            if hasattr(self, "retriever") and self.retriever:
+                llm_client = self.retriever.client
+            elif hasattr(self, "llm_client"):
+                llm_client = self.llm_client
+                
+        # Also, attach model to the client object temporarily for the pipeline
+        if llm_client and not hasattr(llm_client, "model"):
+            llm_client.model = self.config.llm.model
+            
         def _progress(msg: str) -> None:
             if on_progress:
                 on_progress(msg)
             else:
                 logger.info(msg)
 
-        # Load documents
-        _progress("Discovering files...")
-        documents = self.loader.load(sources)
-        _progress(f"Found {len(documents)} documents")
-
-        # Hook: post_load - transform documents before chunking
-        if self._post_load_hook:
-            documents = self._post_load_hook(documents)
-
-        # Chunk documents
-        all_chunks = []
-        for i, doc in enumerate(documents, 1):
-            _progress(f"Chunking {i}/{len(documents)}: {doc.source}")
-            if self._use_hierarchical:
-                # Hierarchical chunking returns (parents, children)
-                # We store children for retrieval but keep parent context
-                parent_chunks, child_chunks = self.chunker.chunk_document(doc)
-                all_chunks.extend(child_chunks)
-            else:
-                chunks = self.chunker.chunk_document(doc)
-                all_chunks.extend(chunks)
-
-        _progress(f"Created {len(all_chunks)} chunks")
-
-        # Hook: post_chunk - transform chunks before embedding
-        if self._post_chunk_hook:
-            all_chunks = self._post_chunk_hook(all_chunks)
-
-        # Generate embeddings with per-batch progress
-        _progress(f"Generating embeddings for {len(all_chunks)} chunks...")
-        chunks_with_embeddings = self.embedder.embed_chunks(
-            all_chunks,
+        pipeline.ingest(
+            sources, 
             on_progress=_progress,
+            llm_client=llm_client
         )
-        _progress("Embeddings complete")
 
-        # Hook: post_embed - transform chunks before storage (e.g., entity extraction)
-        if self._post_embed_hook:
-            chunks_with_embeddings = self._post_embed_hook(chunks_with_embeddings)
-
-        # Store in vector database
-        _progress("Storing chunks...")
-        self.store.add_chunks(chunks_with_embeddings)
-
-        # Extract entities and relationships for knowledge graph
-        if self._use_graph and self._graph:
-            _progress("Extracting knowledge graph...")
-            for chunk in chunks_with_embeddings:
-                self._graph.extract_and_add(
-                    text=chunk.text,
-                    llm_client=self.retriever.client,
-                    model=self.config.llm.model,
-                )
-            self._graph.save()
-
-        # Index for hybrid search if enabled
-        if self._use_hybrid_search and self._hybrid_searcher:
-            chunk_texts = self.store.get_all_chunk_texts()
-            self._hybrid_searcher.index_chunks(chunk_texts)
-
-        # Register sources for auto-update
-        if self._auto_update_enabled and self._updater:
-            for doc in documents:
-                self._tracked_sources[doc.source] = doc
-                # Register with updater
-                if ChangeDetector.is_url(doc.source):
-                    metadata = ChangeDetector.get_url_metadata(doc.source, doc.content)
-                else:
-                    metadata = ChangeDetector.get_file_metadata(doc.source, doc.content)
-
-                self._updater.register_source(
-                    doc.source, doc.content, check_interval=None
-                )
-
-        _progress("Done")
         return self
 
     def _background_refresh(self, source: Union[str, List[str]]) -> None:
@@ -438,110 +429,12 @@ class Ragi:
         filters: Optional[Dict[str, Any]] = None,
     ) -> Answer:
         """Internal implementation of ask with explicit filters."""
-        # Validate query
-        if not query or not query.strip():
-            return Answer(
-                text="Please provide a valid question.",
-                citations=[],
-                query=query,
-            )
-
-        # Determine queries to use for retrieval
-        if self._use_hyde and self._hyde:
-            # HyDE: generate hypothetical document and use that for retrieval
-            try:
-                hypothetical_doc = self._hyde.transform_query(query)
-                query_variations = [hypothetical_doc]
-                logger.debug(f"HyDE generated: {hypothetical_doc[:100]}...")
-            except Exception as e:
-                logger.warning(f"HyDE failed: {e}, falling back to regular query")
-                query_variations = self.retriever.expand_query(query)
-        else:
-            # Standard query expansion
-            query_variations = self.retriever.expand_query(query)
-
-        # Search with all query variations and merge results
-        all_citations = []
-        seen_chunks = set()
-
-        # Get more candidates if we're using cross-encoder reranking
-        search_top_k = top_k * 4 if self._use_cross_encoder else top_k
-
-        for query_var in query_variations:
-            # Generate query embedding
-            query_embedding = self.embedder.embed_query(query_var)
-
-            # Search for relevant chunks
-            citations = self.store.search(
-                query_embedding=query_embedding,
-                top_k=search_top_k,
-                filters=filters,
-            )
-
-            # Add unique citations
-            for citation in citations:
-                chunk_id = (citation.source, citation.chunk[:100])
-                if chunk_id not in seen_chunks:
-                    seen_chunks.add(chunk_id)
-                    all_citations.append(citation)
-
-        # Apply hybrid search if enabled
-        if self._use_hybrid_search and self._hybrid_searcher:
-            try:
-                all_citations = self._hybrid_searcher.search(
-                    query=query,  # Use original query for BM25
-                    vector_citations=all_citations,
-                    top_k=search_top_k,
-                )
-            except Exception as e:
-                logger.warning(f"Hybrid search failed: {e}")
-                # Continue with vector-only results
-
-        # Apply cross-encoder reranking if enabled
-        if self._use_cross_encoder and self._cross_encoder:
-            try:
-                all_citations = self._cross_encoder.rerank(
-                    query=query,  # Use original query for reranking
-                    citations=all_citations,
-                    top_k=top_k,
-                )
-            except Exception as e:
-                logger.warning(f"Cross-encoder reranking failed: {e}")
-                # Fall back to score-based sorting
-                all_citations.sort(key=lambda c: c.score, reverse=True)
-                all_citations = all_citations[:top_k]
-        else:
-            # Sort by score and take top_k
-            all_citations.sort(key=lambda c: c.score, reverse=True)
-            all_citations = all_citations[:top_k]
-
-        final_citations = all_citations
-
-        # For hierarchical chunks, expand to parent context
-        if self._use_hierarchical:
-            final_citations = self._expand_to_parent_context(final_citations)
-
-        # Add graph context if enabled
-        graph_context = ""
-        if self._use_graph and self._graph:
-            graph_context = self._graph.to_context(query, max_triples=10)
-
-        # Build system prompt with graph context
-        final_system_prompt = system_prompt
-        if graph_context:
-            if final_system_prompt:
-                final_system_prompt = f"{final_system_prompt}\n\n{graph_context}"
-            else:
-                final_system_prompt = graph_context
-
-        # Generate answer
-        answer = self.retriever.generate_answer(
+        return self._retrieval_pipeline.ask(
             query=query,
-            citations=final_citations,
-            system_prompt=final_system_prompt,
+            top_k=top_k,
+            system_prompt=system_prompt,
+            filters=filters,
         )
-
-        return answer
 
     def retrieve(
         self,
@@ -579,111 +472,11 @@ class Ragi:
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Citation]:
         """Internal implementation of retrieve with explicit filters."""
-        from .types import Citation
-
-        # Validate query
-        if not query or not query.strip():
-            return []
-
-        # Determine queries to use for retrieval
-        if self._use_hyde and self._hyde:
-            try:
-                hypothetical_doc = self._hyde.transform_query(query)
-                query_variations = [hypothetical_doc]
-                logger.debug(f"HyDE generated: {hypothetical_doc[:100]}...")
-            except Exception as e:
-                logger.warning(f"HyDE failed: {e}, falling back to regular query")
-                query_variations = [query]
-        else:
-            # Use original query (skip expansion for pure retrieval)
-            query_variations = [query]
-
-        # Search with all query variations and merge results
-        all_citations = []
-        seen_chunks = set()
-
-        # Get more candidates if we're using cross-encoder reranking
-        search_top_k = top_k * 4 if self._use_cross_encoder else top_k
-
-        for query_var in query_variations:
-            # Generate query embedding
-            query_embedding = self.embedder.embed_query(query_var)
-
-            # Search for relevant chunks
-            citations = self.store.search(
-                query_embedding=query_embedding,
-                top_k=search_top_k,
-                filters=filters,
-            )
-
-            # Add unique citations
-            for citation in citations:
-                chunk_id = (citation.source, citation.chunk[:100])
-                if chunk_id not in seen_chunks:
-                    seen_chunks.add(chunk_id)
-                    all_citations.append(citation)
-
-        # Apply hybrid search if enabled
-        if self._use_hybrid_search and self._hybrid_searcher:
-            try:
-                all_citations = self._hybrid_searcher.search(
-                    query=query,
-                    vector_citations=all_citations,
-                    top_k=search_top_k,
-                )
-            except Exception as e:
-                logger.warning(f"Hybrid search failed: {e}")
-
-        # Apply cross-encoder reranking if enabled
-        if self._use_cross_encoder and self._cross_encoder:
-            try:
-                all_citations = self._cross_encoder.rerank(
-                    query=query,
-                    citations=all_citations,
-                    top_k=top_k,
-                )
-            except Exception as e:
-                logger.warning(f"Cross-encoder reranking failed: {e}")
-                all_citations.sort(key=lambda c: c.score, reverse=True)
-                all_citations = all_citations[:top_k]
-        else:
-            all_citations.sort(key=lambda c: c.score, reverse=True)
-            all_citations = all_citations[:top_k]
-
-        # For hierarchical chunks, expand to parent context
-        if self._use_hierarchical:
-            all_citations = self._expand_to_parent_context(all_citations)
-
-        return all_citations
-
-    def _expand_to_parent_context(self, citations: List) -> List:
-        """
-        Expand child chunks to include parent context.
-
-        For hierarchical chunking, we retrieve using precise child chunks
-        but include the larger parent context for answer generation.
-        """
-        from .types import Citation
-
-        expanded = []
-        for citation in citations:
-            if "parent_text" in citation.metadata:
-                # Replace chunk with parent context
-                expanded.append(
-                    Citation(
-                        source=citation.source,
-                        chunk=citation.metadata["parent_text"],
-                        score=citation.score,
-                        metadata={
-                            k: v for k, v in citation.metadata.items()
-                            if k != "parent_text"
-                        },
-                    )
-                )
-            else:
-                expanded.append(citation)
-
-        return expanded
+        return self._retrieval_pipeline.retrieve(
+            query=query,
+            top_k=top_k,
+            filters=filters,
+        )
 
     def filter(self, **kwargs: Any) -> "Ragi":
         """

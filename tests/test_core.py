@@ -47,7 +47,7 @@ class TestRagiInit:
 
         assert kb.store.count() == 0
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     def test_init_with_config(self, mock_openai, temp_dir):
         """Test initialization with custom config."""
         persist_dir = os.path.join(temp_dir, "test_ragi")
@@ -102,7 +102,7 @@ class TestRagiAdd:
 class TestRagiQuery:
     """Tests for querying."""
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_ask_question(
         self,
@@ -133,7 +133,7 @@ class TestRagiQuery:
         assert answer.text
         assert answer.query == "What is this document about?"
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_callable_interface(
         self,
@@ -175,7 +175,7 @@ class TestRagiFilter:
         assert isinstance(result, FilteredRagi)
         assert result is not kb
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_filter_chaining(
         self,
@@ -261,7 +261,7 @@ class TestRagiEmbedderInjection:
         # Custom embedder should be used, not the one from config
         assert kb.embedder is mock_embedder
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     def test_custom_embedder_used_for_query(
         self,
         mock_openai,

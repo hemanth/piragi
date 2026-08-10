@@ -27,7 +27,7 @@ class TestHyDE:
 
     def test_init_defaults(self):
         """Test HyDE initialization with defaults."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             hyde = HyDE()
             assert hyde.model == "llama3.2"
             assert hyde.num_hypothetical == 1
@@ -35,7 +35,7 @@ class TestHyDE:
 
     def test_init_custom(self):
         """Test HyDE with custom configuration."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             hyde = HyDE(
                 model="gpt-4",
                 num_hypothetical=3,
@@ -47,7 +47,7 @@ class TestHyDE:
             assert hyde.temperature == 0.5
             assert hyde.max_tokens == 512
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_generate_hypothetical_document(self, mock_openai):
         """Test generating a hypothetical document."""
         mock_client = MagicMock()
@@ -67,7 +67,7 @@ class TestHyDE:
         assert "Python" in result
         mock_client.chat.completions.create.assert_called_once()
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_generate_hypothetical_fallback_on_error(self, mock_openai):
         """Test fallback to original query on error."""
         mock_client = MagicMock()
@@ -81,7 +81,7 @@ class TestHyDE:
         # Should return original query on failure
         assert result == query
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_generate_multiple(self, mock_openai):
         """Test generating multiple hypothetical documents."""
         mock_client = MagicMock()
@@ -97,7 +97,7 @@ class TestHyDE:
         assert len(results) == 3
         assert mock_client.chat.completions.create.call_count == 3
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_transform_query(self, mock_openai):
         """Test transform_query method."""
         mock_client = MagicMock()
@@ -118,12 +118,12 @@ class TestQueryExpander:
 
     def test_init_defaults(self):
         """Test QueryExpander initialization."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             expander = QueryExpander()
             assert expander.model == "llama3.2"
             assert expander.num_expansions == 2
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_expand_returns_original_plus_variations(self, mock_openai):
         """Test that expand returns original query plus variations."""
         mock_client = MagicMock()
@@ -141,7 +141,7 @@ class TestQueryExpander:
         assert len(results) >= 1
         assert "What is Python?" in results  # Original should be first
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_expand_fallback_on_error(self, mock_openai):
         """Test fallback to original query on error."""
         mock_client = MagicMock()
@@ -154,7 +154,7 @@ class TestQueryExpander:
 
         assert results == [query]
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_expand_filters_short_lines(self, mock_openai):
         """Test that very short variations are filtered out."""
         mock_client = MagicMock()
@@ -171,7 +171,7 @@ class TestQueryExpander:
         for result in results:
             assert len(result) > 5 or result == "What is Python?"
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_expand_removes_numbering(self, mock_openai):
         """Test that numbered lists are cleaned up."""
         mock_client = MagicMock()
@@ -196,26 +196,26 @@ class TestMultiQueryRetriever:
 
     def test_init_both_enabled(self):
         """Test initialization with both methods enabled."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             retriever = MultiQueryRetriever(use_hyde=True, use_expansion=True)
             assert retriever.hyde is not None
             assert retriever.expander is not None
 
     def test_init_hyde_only(self):
         """Test initialization with HyDE only."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             retriever = MultiQueryRetriever(use_hyde=True, use_expansion=False)
             assert retriever.hyde is not None
             assert retriever.expander is None
 
     def test_init_expansion_only(self):
         """Test initialization with expansion only."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             retriever = MultiQueryRetriever(use_hyde=False, use_expansion=True)
             assert retriever.hyde is None
             assert retriever.expander is not None
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_get_queries_with_both(self, mock_openai):
         """Test getting queries with both methods enabled."""
         mock_client = MagicMock()
@@ -232,7 +232,7 @@ class TestMultiQueryRetriever:
         assert len(results) >= 2
         assert "What is Python?" in results
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_get_queries_handles_hyde_failure(self, mock_openai):
         """Test graceful handling of HyDE failure."""
         mock_client = MagicMock()
@@ -262,11 +262,11 @@ class TestStepBackPrompting:
 
     def test_init(self):
         """Test initialization."""
-        with patch("piragi.query_transform.OpenAI"):
+        with patch("openai.OpenAI"):
             stepback = StepBackPrompting()
             assert stepback.model == "llama3.2"
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_generate_stepback_query(self, mock_openai):
         """Test generating a step-back query."""
         mock_client = MagicMock()
@@ -285,7 +285,7 @@ class TestStepBackPrompting:
 
         assert "authentication" in result.lower() or len(result) > 10
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_generate_stepback_fallback(self, mock_openai):
         """Test fallback on error."""
         mock_client = MagicMock()
@@ -298,7 +298,7 @@ class TestStepBackPrompting:
 
         assert result == query
 
-    @patch("piragi.query_transform.OpenAI")
+    @patch("openai.OpenAI")
     def test_get_queries(self, mock_openai):
         """Test getting both original and step-back queries."""
         mock_client = MagicMock()

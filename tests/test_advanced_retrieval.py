@@ -92,7 +92,7 @@ def create_mock_embedding_generator(mock_embeddings):
 class TestRagiAdvancedConfig:
     """Tests for Ragi with advanced configuration."""
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_init_with_hyde(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test initialization with HyDE enabled."""
@@ -108,7 +108,7 @@ class TestRagiAdvancedConfig:
         assert kb._use_hyde is True
         assert kb._hyde is not None
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_init_with_hybrid_search(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test initialization with hybrid search enabled."""
@@ -124,7 +124,7 @@ class TestRagiAdvancedConfig:
         assert kb._use_hybrid_search is True
         assert kb._hybrid_searcher is not None
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_init_with_cross_encoder(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test initialization with cross-encoder reranking enabled."""
@@ -140,7 +140,7 @@ class TestRagiAdvancedConfig:
         assert kb._use_cross_encoder is True
         assert kb._cross_encoder is not None
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_init_all_advanced_features(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test initialization with all advanced features."""
@@ -168,7 +168,7 @@ class TestRagiSemanticChunking:
     """Tests for Ragi with different chunking strategies."""
 
     @patch("sentence_transformers.SentenceTransformer")
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_semantic_chunking_strategy(
         self, mock_embed_gen, mock_openai, mock_semantic_st, temp_dir, sample_docs_dir, mock_embeddings
@@ -189,7 +189,7 @@ class TestRagiSemanticChunking:
         from piragi.semantic_chunking import SemanticChunker
         assert isinstance(kb.chunker, SemanticChunker)
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_hierarchical_chunking_strategy(
         self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings
@@ -214,7 +214,7 @@ class TestRagiSemanticChunking:
 class TestRagiQueryValidation:
     """Tests for query validation."""
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_empty_query(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test handling of empty query."""
@@ -226,7 +226,7 @@ class TestRagiQueryValidation:
         assert isinstance(answer, Answer)
         assert "valid question" in answer.text.lower()
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_whitespace_query(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test handling of whitespace-only query."""
@@ -242,7 +242,7 @@ class TestRagiQueryValidation:
 class TestRagiHybridSearchIntegration:
     """Integration tests for hybrid search."""
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_add_indexes_for_hybrid(
         self, mock_embed_gen, mock_openai, temp_dir, sample_docs_dir, mock_embeddings
@@ -262,7 +262,7 @@ class TestRagiHybridSearchIntegration:
         assert kb._hybrid_searcher is not None
         assert len(kb._hybrid_searcher._chunk_texts) > 0
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_hybrid(
         self, mock_embed_gen, mock_openai, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
@@ -296,7 +296,7 @@ class TestRagiCrossEncoderIntegration:
     """Integration tests for cross-encoder reranking."""
 
     @patch("sentence_transformers.CrossEncoder")
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_cross_encoder(
         self, mock_embed_gen, mock_openai, mock_ce, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
@@ -333,8 +333,8 @@ class TestRagiCrossEncoderIntegration:
 class TestRagiHyDEIntegration:
     """Integration tests for HyDE."""
 
-    @patch("piragi.query_transform.OpenAI")
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_search_uses_hyde(
         self, mock_embed_gen, mock_retrieval_openai, mock_hyde_openai, temp_dir, sample_docs_dir, mock_embeddings, mock_llm_response
@@ -376,7 +376,7 @@ class TestRagiHyDEIntegration:
 class TestRagiVectorDimensions:
     """Tests for correct vector dimension handling."""
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_default_dimension_matches_model(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test that store dimension matches default embedding model."""
@@ -387,7 +387,7 @@ class TestRagiVectorDimensions:
         # Default model is all-mpnet-base-v2 (768 dim)
         assert kb.store.vector_dimension == 768
 
-    @patch("piragi.retrieval.OpenAI")
+    @patch("openai.OpenAI")
     @patch("piragi.core.EmbeddingGenerator")
     def test_custom_model_dimension(self, mock_embed_gen, mock_openai, temp_dir, mock_embeddings):
         """Test that store dimension matches custom embedding model."""

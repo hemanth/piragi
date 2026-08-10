@@ -35,6 +35,8 @@ from .async_ragi import AsyncRagi
 from .embeddings import EmbeddingGenerator
 from .types import Answer, Citation
 from .config import RagiConfig
+from .llm_client import LLMClient
+from .pipelines.ingestion import IngestionPipeline
 
 # Advanced components (optional imports)
 from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
@@ -54,7 +56,7 @@ from .stores import (
     QdrantStore,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __all__ = [
     # Core
     "Ragi",
@@ -63,6 +65,8 @@ __all__ = [
     "Answer",
     "Citation",
     "RagiConfig",
+    "LLMClient",
+    "IngestionPipeline",
     # Vector stores
     "VectorStoreProtocol",
     "LanceStore",

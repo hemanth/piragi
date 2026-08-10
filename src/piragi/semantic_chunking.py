@@ -207,6 +207,7 @@ class ContextualChunker:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         context_template: Optional[str] = None,
+        llm_client = None,
     ) -> None:
         """
         Initialize contextual chunker.
@@ -223,14 +224,21 @@ class ContextualChunker:
         from openai import OpenAI
 
         self.base_chunker = base_chunker
-        self.model = model
 
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+    
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
 
         self.context_template = context_template or (
             "<document_context>\n{context}\n</document_context>\n\n{chunk}"
@@ -269,8 +277,7 @@ Write a very brief (1-2 sentence) context that situates this chunk within the ov
 Context:"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm_client.complete(
                 messages=[
                     {
                         "role": "system",
@@ -351,6 +358,7 @@ class PropositionChunker:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         max_propositions_per_call: int = 20,
+        llm_client = None,
     ) -> None:
         """
         Initialize proposition chunker.
@@ -365,15 +373,22 @@ class PropositionChunker:
 
         from openai import OpenAI
 
-        self.model = model
         self.max_propositions_per_call = max_propositions_per_call
 
-        if base_url is None:
-            base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
-        if api_key is None:
-            api_key = os.getenv("LLM_API_KEY", "not-needed")
-
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+    
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
 
     def _extract_propositions(self, text: str) -> List[str]:
         """
@@ -400,8 +415,7 @@ Do not number them or add any prefixes.
 Propositions:"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.llm_client.complete(
                 messages=[
                     {
                         "role": "system",

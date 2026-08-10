@@ -63,6 +63,67 @@ class DocumentLoader:
         self.converter = MarkItDown()
         self.failed_count = 0
 
+    def stream(self, sources):
+        """Yield documents one at a time instead of loading all into memory.
+        
+        Args:
+            sources: File paths, directory paths, URLs, or list of mixed sources
+        
+        Yields:
+            Document objects one at a time
+        """
+        if isinstance(sources, str):
+            sources = [sources]
+
+        self.failed_count = 0
+        for source in sources:
+            if self._is_remote_uri(source):
+                for doc in self._load_remote(source):
+                    yield doc
+            elif self._is_crawl_url(source):
+                for doc in self._crawl_url(source):
+                    yield doc
+            elif self._is_url(source):
+                try:
+                    doc = self._load_url(source)
+                    if doc:
+                        yield doc
+                except Exception as e:
+                    logger.warning("Failed to load %s: %s", source, e)
+                    self.failed_count += 1
+            elif any(char in source for char in ["*", "?", "[", "]"]):
+                for doc in self._load_glob(source):
+                    yield doc
+            elif os.path.isdir(source):
+                for doc in self._stream_directory(source):
+                    yield doc
+            elif os.path.isfile(source):
+                try:
+                    doc = self._load_file(source)
+                    if doc:
+                        yield doc
+                except Exception as e:
+                    logger.warning("Failed to load %s: %s", source, e)
+                    self.failed_count += 1
+            else:
+                logger.warning("Skipping unknown source: %s", source)
+
+        if self.failed_count > 0:
+            logger.warning("%d file(s) failed to load", self.failed_count)
+
+    def _stream_directory(self, directory):
+        """Yield documents from a directory recursively."""
+        for root, dirs, files in os.walk(directory):
+            for filename in sorted(files):
+                filepath = os.path.join(root, filename)
+                try:
+                    doc = self._load_file(filepath)
+                    if doc:
+                        yield doc
+                except Exception as e:
+                    logger.warning("Failed to load %s: %s", filepath, e)
+                    self.failed_count += 1
+
     def load(self, source: Union[str, List[str]]) -> List[Document]:
         """
         Load documents from file paths, URLs, or glob patterns.
@@ -79,42 +140,21 @@ class DocumentLoader:
             sources = source
 
         documents = []
-        self.failed_count = 0
         for src in sources:
-            documents.extend(self._load_single(src))
-
-        if self.failed_count > 0:
-            logger.warning("%d file(s) failed to load", self.failed_count)
+            # Check for invalid source to maintain backward compatibility
+            if not (
+                self._is_remote_uri(src) or
+                self._is_crawl_url(src) or
+                self._is_url(src) or
+                any(char in src for char in ["*", "?", "[", "]"]) or
+                os.path.isdir(src) or
+                os.path.isfile(src)
+            ):
+                raise ValueError("Invalid source: {}".format(src))
+                
+            documents.extend(list(self.stream([src])))
 
         return documents
-
-    def _load_single(self, source: str) -> List[Document]:
-        """Load from a single source (file, URL, glob pattern, or remote URI)."""
-        # Check if it's a remote filesystem URI (s3://, gs://, az://, etc.)
-        if self._is_remote_uri(source):
-            return self._load_remote(source)
-
-        # Check if it's a crawl URL (ends with /**)
-        if self._is_crawl_url(source):
-            return self._crawl_url(source)
-
-        # Check if it's a URL (http/https)
-        if self._is_url(source):
-            return [self._load_url(source)]
-
-        # Check if it's a glob pattern
-        if any(char in source for char in ["*", "?", "[", "]"]):
-            return self._load_glob(source)
-
-        # Single file
-        if os.path.isfile(source):
-            return [self._load_file(source)]
-
-        # Directory - load all files
-        if os.path.isdir(source):
-            return self._load_directory(source)
-
-        raise ValueError(f"Invalid source: {source}")
 
     def _is_remote_uri(self, source: str) -> bool:
         """Check if source is a remote filesystem URI (s3://, gs://, az://, etc.)."""
@@ -185,25 +225,7 @@ class DocumentLoader:
 
         return [self._load_file(f) for f in files]
 
-    def _load_directory(self, directory: str) -> List[Document]:
-        """Load all files from a directory recursively."""
-        pattern = os.path.join(directory, "**", "*")
-        files = glob.glob(pattern, recursive=True)
-        files = [f for f in files if os.path.isfile(f)]
 
-        if not files:
-            raise ValueError(f"No files found in directory: {directory}")
-
-        documents = []
-        for f in files:
-            try:
-                documents.append(self._load_file(f))
-            except Exception as e:
-                logger.warning("Failed to load %s: %s", f, e)
-                self.failed_count += 1
-                continue
-
-        return documents
 
     def _load_remote(self, uri: str) -> List[Document]:
         """
