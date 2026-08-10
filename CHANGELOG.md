@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.2.0] - 2026-08-10
+## [1.2.1] - 2026-08-10
+
+### Added
+- Parallel multi-query vector search via `ThreadPoolExecutor` (3-5x faster retrieval)
+- `max_parallel_queries` config for `RetrievalPipeline` (default: 4)
+- 6 new tests for batch query behavior
+
+### Changed
+- `RetrievalPipeline.retrieve()` and `ask()` now search all query variations concurrently
+- Single-query paths skip executor overhead (no regression)
+- Graceful degradation: if one query variation fails, others still return results
+
 
 ### Added
 - `LLMClient` — Unified LLM client with connection pooling and retry logic

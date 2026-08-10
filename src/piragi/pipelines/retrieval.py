@@ -1,5 +1,6 @@
 import logging
 from typing import Optional, Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +9,7 @@ class RetrievalPipeline:
     
     def __init__(self, embedder, store, retriever,
                  hyde=None, hybrid_searcher=None, cross_encoder=None,
-                 graph=None, use_hierarchical=False):
+                 graph=None, use_hierarchical=False, max_parallel_queries=4):
         self.embedder = embedder
         self.store = store  
         self.retriever = retriever
@@ -17,6 +18,7 @@ class RetrievalPipeline:
         self.cross_encoder = cross_encoder
         self.graph = graph
         self.use_hierarchical = use_hierarchical
+        self.max_parallel_queries = max_parallel_queries
         
     def _expand_to_parent_context(self, citations: List) -> List:
         """
@@ -42,6 +44,15 @@ class RetrievalPipeline:
                 expanded.append(citation)
         return expanded
     
+    def _search_single_query(self, query_var, search_top_k, filters):
+        """Search for a single query variation. Thread-safe."""
+        query_embedding = self.embedder.embed_query(query_var)
+        return self.store.search(
+            query_embedding=query_embedding,
+            top_k=search_top_k,
+            filters=filters,
+        )
+
     def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None):
         """Retrieve relevant chunks for a query.
         
@@ -81,23 +92,24 @@ class RetrievalPipeline:
         # Get more candidates if we're using cross-encoder reranking
         search_top_k = top_k * 4 if self.cross_encoder else top_k
 
-        for query_var in query_variations:
-            # Generate query embedding
-            query_embedding = self.embedder.embed_query(query_var)
-
-            # Search for relevant chunks
-            citations = self.store.search(
-                query_embedding=query_embedding,
-                top_k=search_top_k,
-                filters=filters,
-            )
-
-            # Add unique citations
-            for citation in citations:
-                chunk_id = (citation.source, citation.chunk[:100])
-                if chunk_id not in seen_chunks:
-                    seen_chunks.add(chunk_id)
-                    all_citations.append(citation)
+        # Calculate max workers based on variations and configured limit
+        workers = min(len(query_variations), max(1, self.max_parallel_queries))
+        
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(self._search_single_query, qv, search_top_k, filters): qv
+                for qv in query_variations
+            }
+            for future in as_completed(futures):
+                try:
+                    citations = future.result()
+                    for citation in citations:
+                        chunk_id = (citation.source, citation.chunk[:100])
+                        if chunk_id not in seen_chunks:
+                            seen_chunks.add(chunk_id)
+                            all_citations.append(citation)
+                except Exception as e:
+                    logger.warning("Query variation search failed: {}".format(str(e)))
 
         # Apply hybrid search if enabled
         if self.hybrid_searcher:
@@ -174,23 +186,24 @@ class RetrievalPipeline:
         # Get more candidates if we're using cross-encoder reranking
         search_top_k = top_k * 4 if self.cross_encoder else top_k
 
-        for query_var in query_variations:
-            # Generate query embedding
-            query_embedding = self.embedder.embed_query(query_var)
-
-            # Search for relevant chunks
-            citations = self.store.search(
-                query_embedding=query_embedding,
-                top_k=search_top_k,
-                filters=filters,
-            )
-
-            # Add unique citations
-            for citation in citations:
-                chunk_id = (citation.source, citation.chunk[:100])
-                if chunk_id not in seen_chunks:
-                    seen_chunks.add(chunk_id)
-                    all_citations.append(citation)
+        # Calculate max workers based on variations and configured limit
+        workers = min(len(query_variations), max(1, self.max_parallel_queries))
+        
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(self._search_single_query, qv, search_top_k, filters): qv
+                for qv in query_variations
+            }
+            for future in as_completed(futures):
+                try:
+                    citations = future.result()
+                    for citation in citations:
+                        chunk_id = (citation.source, citation.chunk[:100])
+                        if chunk_id not in seen_chunks:
+                            seen_chunks.add(chunk_id)
+                            all_citations.append(citation)
+                except Exception as e:
+                    logger.warning("Query variation search failed: {}".format(str(e)))
 
         # Apply hybrid search if enabled
         if self.hybrid_searcher:
