@@ -153,14 +153,16 @@
                 <div class="landing-term-dot"></div>
                 <div class="landing-term-dot"></div>
                 <div class="landing-term-dot"></div>
-                <span class="landing-term-title">python3</span>
+                <span class="landing-term-title">quickstart.py</span>
             </div>
             <div class="landing-term-body">
-                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">from piragi import Ragi</span><br>
-                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">kb = Ragi("./docs")</span><br>
-                <span class="t-out">indexing 847 chunks...</span><br>
-                <span class="t-prompt">&gt;&gt;&gt; </span><span class="t-cmd">kb.retrieve("deploy to production")</span><br>
-                <span class="t-out">[Citation(source="deploy.md", score=0.94), ...]</span>
+                <pre style="margin:0;background:transparent;padding:0;overflow:visible;"><code id="landing-code" class="language-python">from piragi import Ragi
+
+kb = Ragi("./docs")
+answer = kb.ask("How to deploy to production?")
+
+print(answer.text)
+print(answer.citations)</code></pre>
             </div>
         </div>
 
@@ -210,14 +212,14 @@
                 <div class="landing-card-desc">2-5x faster embeddings on CPU via ONNX Runtime</div>
             </div>
             <div class="landing-card">
-                <div class="landing-card-title">async</div>
-                <div class="landing-card-desc">Non-blocking API for web frameworks</div>
+                <div class="landing-card-title">pipelines</div>
+                <div class="landing-card-desc">Composable Ingestion & Retrieval pipelines</div>
             </div>
         </div>
 
         <div class="landing-actions">
             <button class="landing-enter" onclick="enterPlayground()">Open Playground</button>
-            <span class="landing-meta">v0.8.1</span>
+            <span class="landing-meta">v1.2.1</span>
         </div>
     </div>
 </div>
@@ -250,9 +252,10 @@
         <div class="tab" onclick="switchTab(6)" id="tab-6"><span class="tab-icon">7</span><span>Knowledge Graph</span></div>
         <div class="tab" onclick="switchTab(7)" id="tab-7"><span class="tab-icon">8</span><span>Async</span></div>
         <div class="tab" onclick="switchTab(8)" id="tab-8"><span class="tab-icon">9</span><span>Config</span></div>
-        <div class="tab" onclick="switchTab(9)" id="tab-9"><span class="tab-icon">10</span><span>Ask (LLM)</span></div>
-        <div class="tab" onclick="switchTab(10)" id="tab-10"><span class="tab-icon">11</span><span>Pipelines</span></div>
-        <div class="tab" onclick="switchTab(11)" id="tab-11"><span class="tab-icon">12</span><span>Filter & LLM</span></div>
+        <div class="tab" onclick="switchTab(9)" id="tab-9"><span class="tab-icon">10</span><span>Remote FS</span></div>
+        <div class="tab" onclick="switchTab(10)" id="tab-10"><span class="tab-icon">11</span><span>Ask (LLM)</span></div>
+        <div class="tab" onclick="switchTab(11)" id="tab-11"><span class="tab-icon">12</span><span>Pipelines</span></div>
+        <div class="tab" onclick="switchTab(12)" id="tab-12"><span class="tab-icon">13</span><span>Filter & LLM</span></div>
         <details class="file-panel" id="file-panel" style="display:none">
             <summary>Files</summary>
             <div class="file-breadcrumb" id="file-path">~</div>
@@ -620,52 +623,58 @@ print()
 print("citations:", len(answer.citations))
 for c in answer.citations[:3]:
     print("  -", os.path.basename(c.source))` },
-  { title:'Pipelines', lang:'python', code:`from piragi import RagiConfig
+  { title:'Pipelines', lang:'python',
+    setup:`import tempfile, os
+tmp = tempfile.mkdtemp()
+docs = tmp + "/docs"
+os.makedirs(docs)
+with open(docs + "/intro.md", "w") as f:
+    f.write("piragi provides decoupled IngestionPipeline and RetrievalPipeline classes.")`,
+    code:`from piragi import Ragi, DocumentLoader, FixedChunker, EmbeddingGenerator
+from piragi.stores import LanceStore
 from piragi.pipelines import IngestionPipeline, RetrievalPipeline
+from piragi.retrieval import Retriever
 
-# 1. Type-safe config
-config = RagiConfig(
-    embedding={"model": "BAAI/bge-small-en-v1.5"},
-    retrieval={"use_hyde": False}
-)
+# Composable components
+loader = DocumentLoader()
+chunker = FixedChunker(chunk_size=256, chunk_overlap=50)
+embedder = EmbeddingGenerator(model="BAAI/bge-small-en-v1.5")
+store = LanceStore(persist_dir=tmp + "/lance")
+retriever = Retriever()
 
-# 2. Composable Ingestion Pipeline
-print("Initializing IngestionPipeline...")
-ingest = IngestionPipeline(embedder=config.get_embedder(), store=config.get_store())
+# 1. Standalone Ingestion Pipeline
+ingest_pipe = IngestionPipeline(loader, chunker, embedder, store)
+chunks_added = ingest_pipe.ingest(docs)
+print("ingested chunks:", chunks_added)
 
-# 3. Composable Retrieval Pipeline (Parallel search)
-retrieve = RetrievalPipeline(
-    store=config.get_store(), 
-    llm=config.get_llm(),
-    max_parallel_queries=4
-)
-print("Pipeline initialized ready for parallel multi-query search.")` },
+# 2. Standalone Retrieval Pipeline (with parallel multi-query search)
+retrieve_pipe = RetrievalPipeline(embedder, store, retriever, max_parallel_queries=4)
+results = retrieve_pipe.retrieve("pipelines in piragi", top_k=2)
+for r in results:
+    print("--", os.path.basename(r.source), "score:", round(r.score, 3))` },
   { title:'Filter & LLM', lang:'python',
     setup:`import tempfile, os
 tmp = tempfile.mkdtemp()
 docs = tmp + "/docs"
 os.makedirs(docs)
-with open(docs + "/a.txt", "w") as f:
-    f.write("A-side docs")
-with open(docs + "/b.txt", "w") as f:
-    f.write("B-side docs")`,
+with open(docs + "/api.md", "w") as f:
+    f.write("API documentation for v1 and v2 endpoints.")
+with open(docs + "/guide.md", "w") as f:
+    f.write("General user guide for getting started.")`,
     code:`from piragi import Ragi, LLMClient
 
-# Standalone unified client with connection pooling
+# 1. Standalone unified LLM client with connection pooling & retry
 llm_cfg = _llm_config if '_llm_config' in dir() else {}
 client = LLMClient(**llm_cfg)
+print("LLM client model:", client.model)
 
-print("LLM Client test:")
-print(client.generate("Say hello in one word!"))
+# 2. Thread-safe filtering returns an immutable FilteredRagi view
+kb = Ragi(docs, persist_dir=tmp, config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
 
-# Thread-safe filtering returns an immutable FilteredRagi view
-kb = Ragi(docs, config={"embedding": {"model": "BAAI/bge-small-en-v1.5"}})
-
-# .filter() returns a new thread-safe instance
+# .filter() returns a new thread-safe FilteredRagi instance
 kb_api = kb.filter(type="api")
-print("\\nThread-safe instances:")
-print("Base:", type(kb).__name__)
-print("Filtered:", type(kb_api).__name__)` }
+print("Base instance:    ", type(kb).__name__)
+print("Filtered instance:", type(kb_api).__name__)` }
 ];
 
 const simulated = [
@@ -678,9 +687,10 @@ const simulated = [
   'entities: [\"alice\", \"bob\", \"carol\", \"dave\", \"project x\", \"engineering team\"]\ntriples: 5\n  alice --[manages]--> engineering team\n  bob --[reports_to]--> alice\n  carol --[reports_to]--> bob\n  dave --[works_on]--> project x\n\nquery: who reports to Alice?\n-- Bob reports to Alice and leads the backend squad. Carol is a senior engineer...',
   'type: AsyncRagi\ncount: 1\n[0.42s] indexed 3 chunks\n[0.58s] retrieved 2 results\n  -- auth.md score: 0.891\n  -- api.md score: 0.412\n[0.59s] count: 3\n\nasync methods: [add, ask, clear, count, filter, graph, refresh, retrieve]\ntotal: 0.61s',
   'llm:\n  model: llama3.2\n  base_url: http://localhost:11434/v1\nembedding:\n  model: all-mpnet-base-v2\n  backend: onnx\n  batch_size: 32\nchunk:\n  strategy: semantic\n  size: 512\n  overlap: 50\nretrieval:\n  use_hyde: False\n  use_hybrid_search: False\n  use_cross_encoder: False\nauto_update:\n  enabled: True\n  interval: 300',
+  'Remote filesystem schemes:\n  abfs\n  az\n  gcs\n  gs\n  hdfs\n  s3\n  s3a\n  sftp',
   'piragi supports Lance (default, serverless), PostgreSQL with pgvector,\nQdrant with TurboQuant, Pinecone (managed), and Supabase.\n\ncitations: 1\n  - stores.md',
-  'Initializing IngestionPipeline...\nPipeline initialized ready for parallel multi-query search.',
-  'LLM Client test:\nHello!\n\nThread-safe instances:\nBase: Ragi\nFiltered: FilteredRagi'
+  'ingested chunks: 1\n-- intro.md score: 0.912',
+  'LLM client model: llama3.2\nBase instance:     Ragi\nFiltered instance: FilteredRagi'
 ];
 
 // Per-cell output cache
@@ -973,6 +983,9 @@ function runCell(){
 }
 
 switchTab(0);
+if(document.getElementById('landing-code')){
+    Prism.highlightElement(document.getElementById('landing-code'));
+}
 
 // Drag to resize output pane
 (function(){
