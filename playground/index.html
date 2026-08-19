@@ -195,7 +195,7 @@
     <div class="landing-inner">
         <div class="landing-hero">
             <div class="landing-logo">piragi</div>
-            <div class="landing-sub">zero-config RAG for Python</div>
+            <div class="landing-sub">The best zero-config RAG interface yet.</div>
         </div>
 
         <div class="landing-terminal">
@@ -772,7 +772,6 @@ fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
         backendAlive=true;
         document.getElementById('status-dot').classList.add('live');
         document.getElementById('status-text').textContent='live';
-        document.querySelector('.landing-sub').textContent='zero-config RAG for Python / live';
         // Populate LLM config from server
         if(d.llm){
             const llm=d.llm;
@@ -794,7 +793,6 @@ fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
     forceSimulate = true;
     document.querySelector('.sim-toggle').style.display='none';
     document.getElementById('demo-banner').style.display='block';
-    document.querySelector('.landing-sub').textContent='zero-config RAG for Python / demo';
 });
 
 function setLLMPreset(type){
