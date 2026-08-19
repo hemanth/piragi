@@ -793,6 +793,19 @@ fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
     forceSimulate = true;
     document.querySelector('.sim-toggle').style.display='none';
     document.getElementById('demo-banner').style.display='block';
+    try {
+        const saved = localStorage.getItem('piragi-llm-cfg');
+        if(saved){
+            const c = JSON.parse(saved);
+            if(c.model) document.getElementById('llm-model').value = c.model;
+            if(c.base_url) document.getElementById('llm-url').value = c.base_url;
+            if(c.api_key) document.getElementById('llm-key').value = c.api_key;
+            llmReady = true;
+            const st = document.getElementById('llm-status');
+            st.textContent = `saved: ${c.model}`;
+            st.className = 'llm-status llm-ok';
+        }
+    }catch(e){}
 });
 
 function setLLMPreset(type){
@@ -812,24 +825,37 @@ function setLLMPreset(type){
 
 async function saveLLMConfig(){
     const cfg={
-        model:document.getElementById('llm-model').value,
-        base_url:document.getElementById('llm-url').value,
-        api_key:document.getElementById('llm-key').value,
+        model:document.getElementById('llm-model').value.trim() || 'llama3.2',
+        base_url:document.getElementById('llm-url').value.trim() || undefined,
+        api_key:document.getElementById('llm-key').value.trim() || undefined,
     };
-    try{
-        const res=await fetch(`${API}/api/llm-config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
-        const d=await res.json();
-        if(d.ok){
-            llmReady=true;
-            const st=document.getElementById('llm-status');
-            st.textContent=`saved: ${cfg.model}`;
+    try {
+        localStorage.setItem('piragi-llm-cfg', JSON.stringify(cfg));
+    } catch(e){}
+    
+    const st=document.getElementById('llm-status');
+    if(backendAlive && !forceSimulate){
+        try{
+            const res=await fetch(`${API}/api/llm-config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const d=await res.json();
+            if(d.ok){
+                llmReady=true;
+                st.textContent=`saved: ${cfg.model}`;
+                st.className='llm-status llm-ok';
+                return;
+            }
+        }catch(e){
+            st.textContent=`saved locally (${cfg.model})`;
             st.className='llm-status llm-ok';
+            return;
         }
-    }catch(e){
-        const st=document.getElementById('llm-status');
-        st.textContent=`error: ${e.message}`;
-        st.className='llm-status llm-off';
     }
+    
+    // On static hosting (GitHub Pages) or simulation mode
+    llmReady=true;
+    st.textContent=`saved: ${cfg.model}`;
+    st.className='llm-status llm-ok';
 }
 
 function enterPlayground(){
