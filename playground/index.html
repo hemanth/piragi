@@ -3,8 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>piragi playground</title>
-    <meta name="description" content="Interactive playground for piragi — zero-config RAG library">
+    <title>piragi playground · Zero-config RAG for Python</title>
+    <meta name="description" content="Interactive playground and codelabs for piragi — zero-config RAG with built-in embeddings, serverless vector store, citations, and Gemini Nano support.">
+    <meta name="keywords" content="piragi, RAG, python, embeddings, vector database, lance, lancedb, llm, gemini nano, retrieval augmented generation">
+    <meta name="author" content="Hemanth HM">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hemanth.github.io/piragi/">
+    <meta property="og:title" content="piragi playground · Zero-config RAG for Python">
+    <meta property="og:description" content="Explore zero-config RAG in your browser with built-in embeddings, vector search, streaming ingestion, and on-device Gemini Nano.">
+    <meta property="og:image" content="https://hemanth.github.io/piragi/og-image.png">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://hemanth.github.io/piragi/">
+    <meta name="twitter:title" content="piragi playground · Zero-config RAG for Python">
+    <meta name="twitter:description" content="Explore zero-config RAG in your browser with built-in embeddings, vector search, streaming ingestion, and on-device Gemini Nano.">
+    <meta name="twitter:image" content="https://hemanth.github.io/piragi/og-image.png">
+
+    <!-- Agent & LLM Discoverability -->
+    <link rel="help" type="text/plain" href="llms.txt">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "piragi playground",
+      "url": "https://hemanth.github.io/piragi/",
+      "description": "Interactive playground for piragi, a zero-config RAG library for Python with built-in embeddings, vector stores, citations, and composable pipelines.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web, All",
+      "inLanguage": ["en"],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Hemanth HM",
+        "url": "https://github.com/hemanth"
+      },
+      "featureList": [
+        "Zero-config RAG setup",
+        "On-device Gemini Nano inference",
+        "LanceDB embedded serverless vector store",
+        "Streaming document loading & chunking",
+        "Parallel multi-query search",
+        "Knowledge Graph extraction"
+      ]
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -266,10 +316,15 @@ print(answer.citations)</code></pre>
             <details id="llm-details">
                 <summary>LLM Config</summary>
                 <div class="llm-status llm-off" id="llm-status">no LLM detected</div>
+                <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
+                    <button type="button" class="output-clear" onclick="setLLMPreset('gemini')" style="font-size:0.6rem;padding:2px 6px;">Gemini</button>
+                    <button type="button" class="output-clear" onclick="setLLMPreset('openrouter')" style="font-size:0.6rem;padding:2px 6px;">OpenRouter</button>
+                    <button type="button" class="output-clear" onclick="setLLMPreset('ollama')" style="font-size:0.6rem;padding:2px 6px;">Ollama</button>
+                </div>
                 <label>Model</label>
-                <input id="llm-model" value="llama3.2" placeholder="llama3.2">
+                <input id="llm-model" value="google/gemini-2.5-flash" placeholder="model name">
                 <label>Base URL</label>
-                <input id="llm-url" placeholder="http://localhost:11434/v1">
+                <input id="llm-url" placeholder="https://openrouter.ai/api/v1">
                 <label>API Key</label>
                 <input id="llm-key" type="password" placeholder="(optional)">
                 <button class="run-btn" style="margin-top:.5rem;width:100%;justify-content:center" onclick="saveLLMConfig()">Save</button>
@@ -741,6 +796,21 @@ fetch(`${API}/api/health`).then(r=>r.json()).then(d=>{
     document.getElementById('demo-banner').style.display='block';
     document.querySelector('.landing-sub').textContent='zero-config RAG for Python / demo';
 });
+
+function setLLMPreset(type){
+    const model=document.getElementById('llm-model');
+    const url=document.getElementById('llm-url');
+    if(type==='gemini'){
+        model.value='google/gemini-2.5-flash';
+        url.value='https://openrouter.ai/api/v1';
+    } else if(type==='openrouter'){
+        model.value='openai/gpt-4o-mini';
+        url.value='https://openrouter.ai/api/v1';
+    } else if(type==='ollama'){
+        model.value='llama3.2';
+        url.value='http://localhost:11434/v1';
+    }
+}
 
 async function saveLLMConfig(){
     const cfg={

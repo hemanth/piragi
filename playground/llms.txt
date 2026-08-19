@@ -1,0 +1,27 @@
+# piragi playground & codelabs
+
+> Interactive zero-config RAG (Retrieval-Augmented Generation) playground and codelabs for Python.
+
+## Quick Links
+- **Interactive Playground**: https://hemanth.github.io/piragi/
+- **PyPI Package**: https://pypi.org/project/piragi/
+- **GitHub Repository**: https://github.com/hemanth/piragi
+- **Architecture Overview**: https://hemanth.github.io/piragi/docs/architecture/architecture.html
+
+## Key Features
+- **Zero Configuration**: Built-in embeddings and serverless vector store (LanceDB) by default.
+- **Inference Engines**: On-device Gemini Nano (via Chrome AI `window.ai` / Prompt API), Ollama, OpenRouter, and OpenAI-compatible endpoints.
+- **Composable Pipelines**: Modular `IngestionPipeline` (streaming, chunking, embedding, storage) and `RetrievalPipeline` (query transformation, parallel search, reranking, answering).
+- **Format Support**: Markdown, PDF, Word, Excel, source code, text files, and remote blob storage (`s3://`, `gs://`, `az://`, web crawling).
+- **Concurrency & Reliability**: Thread-safe `FilteredRagi` immutable querying, model cache locking, and exponential backoff retry.
+
+## Installation
+```bash
+pip install piragi
+```
+
+## CLI Usage
+Launch local playground with live Python kernel:
+```bash
+piragi playground
+```
