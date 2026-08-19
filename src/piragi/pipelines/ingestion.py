@@ -89,8 +89,10 @@ class IngestionPipeline:
         
         # 7. Hybrid search indexing
         if self.hybrid_searcher:
-            chunk_texts = self.store.get_all_chunk_texts()
-            self.hybrid_searcher.index_chunks(chunk_texts)
+            if hasattr(self.store, "get_all_chunks"):
+                self.hybrid_searcher.index_chunks(self.store.get_all_chunks())
+            else:
+                self.hybrid_searcher.index_chunks(self.store.get_all_chunk_texts())
         
         _progress("Done")
         return len(chunks_with_embeddings)

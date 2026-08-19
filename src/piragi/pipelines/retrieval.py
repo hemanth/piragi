@@ -9,7 +9,8 @@ class RetrievalPipeline:
     
     def __init__(self, embedder, store, retriever,
                  hyde=None, hybrid_searcher=None, cross_encoder=None,
-                 graph=None, use_hierarchical=False, max_parallel_queries=4):
+                 graph=None, use_hierarchical=False, max_parallel_queries=4,
+                 rerank_top_n=0, hybrid_top_n=0):
         self.embedder = embedder
         self.store = store  
         self.retriever = retriever
@@ -19,6 +20,8 @@ class RetrievalPipeline:
         self.graph = graph
         self.use_hierarchical = use_hierarchical
         self.max_parallel_queries = max_parallel_queries
+        self.rerank_top_n = rerank_top_n
+        self.hybrid_top_n = hybrid_top_n
         
     def _expand_to_parent_context(self, citations: List) -> List:
         """
@@ -89,8 +92,11 @@ class RetrievalPipeline:
         all_citations = []
         seen_chunks = set()
 
-        # Get more candidates if we're using cross-encoder reranking
-        search_top_k = top_k * 4 if self.cross_encoder else top_k
+        # Over-fetch candidates when reranking or hybrid fusion is active.
+        if self.cross_encoder or self.hybrid_searcher:
+            search_top_k = self.rerank_top_n or top_k * 4
+        else:
+            search_top_k = top_k
 
         # Calculate max workers based on variations and configured limit
         workers = min(len(query_variations), max(1, self.max_parallel_queries))
@@ -118,6 +124,7 @@ class RetrievalPipeline:
                     query=query,
                     vector_citations=all_citations,
                     top_k=search_top_k,
+                    candidate_pool=self.hybrid_top_n or None,
                 )
             except Exception as e:
                 logger.warning("Hybrid search failed: {}".format(e))
@@ -183,8 +190,11 @@ class RetrievalPipeline:
         all_citations = []
         seen_chunks = set()
 
-        # Get more candidates if we're using cross-encoder reranking
-        search_top_k = top_k * 4 if self.cross_encoder else top_k
+        # Over-fetch candidates when reranking or hybrid fusion is active.
+        if self.cross_encoder or self.hybrid_searcher:
+            search_top_k = self.rerank_top_n or top_k * 4
+        else:
+            search_top_k = top_k
 
         # Calculate max workers based on variations and configured limit
         workers = min(len(query_variations), max(1, self.max_parallel_queries))
@@ -212,6 +222,7 @@ class RetrievalPipeline:
                     query=query,  # Use original query for BM25
                     vector_citations=all_citations,
                     top_k=search_top_k,
+                    candidate_pool=self.hybrid_top_n or None,
                 )
             except Exception as e:
                 logger.warning("Hybrid search failed: {}".format(e))

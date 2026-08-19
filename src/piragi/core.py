@@ -255,6 +255,11 @@ class Ragi:
                 device=self.config.retrieval.cross_encoder_device or self.config.embedding.device,
                 trust_remote_code=self.config.retrieval.trust_remote_code,
             )
+            if self.config.retrieval.warm_models:
+                try:
+                    self._cross_encoder._load_model()
+                except Exception as e:
+                    logger.warning("Cross-encoder warm-up failed: %s", e)
 
         # LLM / Basic retriever
         self.retriever = Retriever(
@@ -308,6 +313,8 @@ class Ragi:
             cross_encoder=self._cross_encoder,
             graph=self._graph,
             use_hierarchical=self._use_hierarchical,
+            rerank_top_n=self.config.retrieval.rerank_top_n,
+            hybrid_top_n=self.config.retrieval.hybrid_top_n,
         )
 
         # Load initial sources if provided

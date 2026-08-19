@@ -197,3 +197,16 @@ class LanceStore:
     def get_all_chunk_texts(self) -> List[str]:
         """Get all chunk texts for hybrid search."""
         return self._chunk_texts
+
+    def get_all_chunks(self) -> List[Dict[str, Any]]:
+        """Get all chunks as records (text/source/metadata) for hybrid indexing."""
+        if self.table is None:
+            return []
+        try:
+            rows = self.table.to_list()
+        except Exception:
+            return [{"text": t, "source": None, "metadata": {}} for t in self._chunk_texts]
+        return [
+            {"text": r["text"], "source": r.get("source"), "metadata": r.get("metadata") or {}}
+            for r in rows
+        ]
