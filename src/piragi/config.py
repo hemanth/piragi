@@ -45,6 +45,8 @@ class RetrievalConfig(BaseModel):
     rerank_top_n: int = 0   # candidate pool size for cross-encoder / vector over-fetch (0 = auto: top_k*4)
     hybrid_top_n: int = 0   # BM25 candidate pool for hybrid fusion (0 = auto: max(top_k*4, 50))
     warm_models: bool = True  # eager-load cross-encoder at init to avoid cold-start p99 spike
+    use_multihop: bool = False  # iterative self-ask retrieval for multi-hop questions
+    max_hops: int = 3  # max retrieval iterations when use_multihop is on
 
 class AutoUpdateConfig(BaseModel):
     model_config = {"extra": "forbid"}

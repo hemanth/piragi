@@ -315,6 +315,8 @@ class Ragi:
             use_hierarchical=self._use_hierarchical,
             rerank_top_n=self.config.retrieval.rerank_top_n,
             hybrid_top_n=self.config.retrieval.hybrid_top_n,
+            use_multihop=self.config.retrieval.use_multihop,
+            max_hops=self.config.retrieval.max_hops,
         )
 
         # Load initial sources if provided

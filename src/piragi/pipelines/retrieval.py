@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Optional, Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -10,7 +11,8 @@ class RetrievalPipeline:
     def __init__(self, embedder, store, retriever,
                  hyde=None, hybrid_searcher=None, cross_encoder=None,
                  graph=None, use_hierarchical=False, max_parallel_queries=4,
-                 rerank_top_n=0, hybrid_top_n=0):
+                 rerank_top_n=0, hybrid_top_n=0,
+                 use_multihop=False, max_hops=3):
         self.embedder = embedder
         self.store = store  
         self.retriever = retriever
@@ -22,6 +24,8 @@ class RetrievalPipeline:
         self.max_parallel_queries = max_parallel_queries
         self.rerank_top_n = rerank_top_n
         self.hybrid_top_n = hybrid_top_n
+        self.use_multihop = use_multihop
+        self.max_hops = max_hops
         
     def _expand_to_parent_context(self, citations: List) -> List:
         """
@@ -57,7 +61,15 @@ class RetrievalPipeline:
         )
 
     def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None):
-        """Retrieve relevant chunks for a query.
+        """Retrieve relevant chunks. Dispatches to multi-hop when enabled."""
+        if not query or not query.strip():
+            return []
+        if self.use_multihop:
+            return self._multihop_retrieve(query, top_k, filters)
+        return self._retrieve_once(query, top_k, filters)
+
+    def _retrieve_once(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None):
+        """Single-pass retrieval for a query.
         
         Steps:
         1. Transform query (HyDE / multi-query expansion)
@@ -151,6 +163,65 @@ class RetrievalPipeline:
 
         return all_citations
     
+    def _next_subquery(self, original, cites, asked):
+        """Ask the LLM for the next search query to fill missing info, or None if enough."""
+        ctx = "\n\n".join(c.chunk[:600] for c in cites[:8])
+        prompt = (
+            "You are decomposing a multi-hop question into search steps.\n"
+            f"Original question: {original}\n\n"
+            f"Information retrieved so far:\n{ctx if ctx else '(nothing yet)'}\n\n"
+            f"Search queries already tried: {asked}\n\n"
+            "If the retrieved information is enough to fully answer the original question, "
+            "reply with exactly: DONE\n"
+            "Otherwise reply with ONE short keyword search query for the single most "
+            "important missing fact. Reply with only the query text or DONE, nothing else."
+        )
+        try:
+            resp = self.retriever.llm_client.complete(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0, max_tokens=60,
+            )
+            out = (resp.choices[0].message.content or "").strip()
+            out = re.sub(r"<think>.*?</think>", "", out, flags=re.DOTALL).strip()
+        except Exception as e:
+            logger.warning("multihop next-subquery failed: {}".format(e))
+            return None
+        if not out or out.upper().startswith("DONE"):
+            return None
+        out = out.strip().strip('"').strip()
+        if out in asked or out == original:
+            return None
+        return out[:200]
+
+    def _multihop_retrieve(self, query, top_k, filters):
+        """Iterative self-ask retrieval: retrieve, find gaps, retrieve again, pool."""
+        pool = {}          # (source, chunk[:100]) -> Citation (first/best seen)
+        asked = []
+        current_q = query
+        hops = max(1, self.max_hops)
+        for hop in range(hops):
+            cites = self._retrieve_once(current_q, top_k, filters)
+            for c in cites:
+                k = (c.source, c.chunk[:100])
+                if k not in pool:
+                    pool[k] = c
+            asked.append(current_q)
+            if hop == hops - 1:
+                break
+            nxt = self._next_subquery(query, list(pool.values()), asked)
+            if not nxt:
+                break
+            current_q = nxt
+        pooled = list(pool.values())
+        # final rank of the pooled evidence against the ORIGINAL query
+        if self.cross_encoder:
+            try:
+                return self.cross_encoder.rerank(query=query, citations=pooled, top_k=top_k)
+            except Exception as e:
+                logger.warning("multihop final rerank failed: {}".format(e))
+        pooled.sort(key=lambda c: c.score, reverse=True)
+        return pooled[:top_k]
+
     def ask(self, query: str, top_k: int = 5, system_prompt: Optional[str] = None, filters: Optional[Dict[str, Any]] = None):
         """Retrieve and generate an answer.
         
@@ -170,6 +241,20 @@ class RetrievalPipeline:
                 text="Please provide a valid question.",
                 citations=[],
                 query=query,
+            )
+
+        # Multi-hop: iterative self-ask retrieval, then generate from pooled evidence
+        if self.use_multihop:
+            final_citations = self._multihop_retrieve(query, top_k, filters)
+            if self.use_hierarchical:
+                final_citations = self._expand_to_parent_context(final_citations)
+            fsp = system_prompt
+            if self.graph:
+                gc = self.graph.to_context(query, max_triples=10)
+                if gc:
+                    fsp = "{}\n\n{}".format(fsp, gc) if fsp else gc
+            return self.retriever.generate_answer(
+                query=query, citations=final_citations, system_prompt=fsp,
             )
 
         # Determine queries to use for retrieval
