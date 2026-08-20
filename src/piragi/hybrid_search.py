@@ -135,7 +135,7 @@ class HybridSearcher:
             if k not in citation_map:
                 rec = self._records[idx]
                 citation_map[k] = Citation(
-                    source=rec["source"],
+                    source=rec["source"] or "",
                     chunk=rec["text"],
                     score=0.0,
                     metadata=rec["metadata"],
