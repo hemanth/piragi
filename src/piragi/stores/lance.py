@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
 from ..types import Chunk, Citation
@@ -91,6 +93,14 @@ class LanceStore:
         self.table: Optional[Any] = None
         self._chunk_texts: List[str] = []
 
+        # In-memory numpy fast-path (flat L2 scan).
+        # Raw matrix + squared norms + parallel row metadata; skips the LanceDB
+        # round-trip for small corpora. Lazily built, invalidated on write.
+        self._vec_matrix: Optional[np.ndarray] = None
+        self._rows: Optional[List[Dict[str, Any]]] = None
+        self._sqnorms: Optional[np.ndarray] = None
+        self._max_inmem = 50000
+
         # Load existing table if present
         if self.table_name in self.db.table_names():
             self.table = self.db.open_table(self.table_name)
@@ -122,10 +132,120 @@ class LanceStore:
 
         self._chunk_texts.extend([chunk.text for chunk in chunks])
 
+        # Invalidate in-memory matrix; rebuilt lazily on next search.
+        self._vec_matrix = None
+        self._rows = None
+        self._sqnorms = None
+
         if self.table is None:
             self.table = self.db.create_table(self.table_name, data=data, mode="overwrite")
         else:
             self.table.add(data)
+
+    def _ensure_inmem(self) -> bool:
+        """Build the in-memory matrix if the corpus is small enough.
+
+        Returns True if the fast-path is available, False to fall back to LanceDB.
+        """
+        if self._vec_matrix is not None:
+            return True
+        if self.table is None:
+            return False
+        try:
+            n = self.table.count_rows()
+        except Exception:
+            n = self.count()
+        if n == 0 or n > self._max_inmem:
+            return False
+
+        try:
+            df = self.table.to_pandas()
+        except Exception:
+            return False
+
+        vecs = np.asarray(df["vector"].tolist(), dtype=np.float32)
+        if vecs.ndim != 2 or vecs.shape[0] == 0:
+            return False
+
+        # Keep raw vectors and precompute squared norms once, so query-time L2
+        # ranking (matching LanceDB's default metric) is a single matmul.
+        self._vec_matrix = vecs
+        self._sqnorms = np.einsum("ij,ij->i", vecs, vecs)
+
+        self._rows = [
+            {
+                "text": row["text"],
+                "source": row["source"],
+                "metadata": row["metadata"],
+            }
+            for _, row in df.iterrows()
+        ]
+        return True
+
+    def _search_inmem(
+        self,
+        query_embedding: List[float],
+        top_k: int,
+        filters: Optional[Dict[str, Any]],
+        min_chunk_length: int,
+    ) -> List[Citation]:
+        matrix = self._vec_matrix
+        rows = self._rows
+        assert matrix is not None and rows is not None
+
+        # Pre-filter candidate rows before scoring.
+        if filters:
+            cand = np.fromiter(
+                (
+                    i
+                    for i, r in enumerate(rows)
+                    if all(
+                        (r["metadata"] or {}).get(k) == v for k, v in filters.items()
+                    )
+                ),
+                dtype=np.int64,
+            )
+            if cand.size == 0:
+                return []
+            sub = matrix[cand]
+        else:
+            cand = None
+            sub = matrix
+
+        q = np.asarray(query_embedding, dtype=np.float32)
+        sqnorms = self._sqnorms if cand is None else self._sqnorms[cand]
+
+        # Squared L2 distance = ||m||^2 - 2 m·q + ||q||^2. The ||q||^2 term is
+        # constant across rows, so ranking uses ||m||^2 - 2 m·q. One matmul.
+        dist2 = sqnorms - 2.0 * (sub @ q)
+
+        # Smallest distance first; over-fetch to survive the length filter.
+        want = min(top_k * 3, dist2.shape[0])
+        if dist2.shape[0] <= want:
+            order = np.argsort(dist2)
+        else:
+            part = np.argpartition(dist2, want - 1)[:want]
+            order = part[np.argsort(dist2[part])]
+
+        qq = float(q @ q)
+        citations: List[Citation] = []
+        for local_idx in order:
+            global_idx = int(cand[local_idx]) if cand is not None else int(local_idx)
+            r = rows[global_idx]
+            if len(r["text"]) < min_chunk_length:
+                continue
+            distance = float(dist2[local_idx]) + qq
+            citations.append(
+                Citation(
+                    source=r["source"],
+                    chunk=r["text"],
+                    score=float(max(0.0, min(1.0, 1.0 - distance))),
+                    metadata=r["metadata"],
+                )
+            )
+            if len(citations) >= top_k:
+                break
+        return citations
 
     def search(
         self,
@@ -137,6 +257,11 @@ class LanceStore:
         """Search for similar chunks."""
         if self.table is None:
             return []
+
+        if self._ensure_inmem():
+            return self._search_inmem(
+                query_embedding, top_k, filters, min_chunk_length
+            )
 
         search_limit = top_k * 3
         query = self.table.search(query_embedding).limit(search_limit)
