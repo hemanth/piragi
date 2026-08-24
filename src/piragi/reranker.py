@@ -159,6 +159,103 @@ class CrossEncoderReranker:
         return float(1 / (1 + np.exp(-score)))
 
 
+class BGEM3Reranker:
+    """
+    Multi-representation reranker using BAAI/bge-m3's native dense + sparse
+    (lexical) + ColBERT (multi-vector) scoring.
+
+    bge-m3 emits three representations per text. A plain bi-encoder retriever
+    only uses the dense vector; rescoring the candidate pool here with the
+    combined dense+sparse+colbert similarity recovers the lexical and
+    late-interaction signal that dense-only retrieval leaves on the table —
+    the accuracy source behind bge-m3's strong multi-hop / entity recall.
+
+    Slots into the same interface as CrossEncoderReranker (rerank / _load_model),
+    so it is a drop-in second-stage reranker.
+    """
+
+    def __init__(
+        self,
+        model_name: str = "BAAI/bge-m3",
+        device: Optional[str] = None,
+        batch_size: int = 16,
+        weights: Tuple[float, float, float] = (0.4, 0.2, 0.4),
+        max_passage_length: int = 512,
+        use_fp16: bool = True,
+    ) -> None:
+        """
+        Args:
+            model_name: bge-m3 model id.
+            device: 'cuda', 'cuda:N', 'cpu', or None for auto.
+            batch_size: pairs scored per batch.
+            weights: (dense, sparse, colbert) fusion weights for the combined score.
+            max_passage_length: token cap per passage during scoring.
+            use_fp16: half precision on GPU.
+        """
+        self.model_name = model_name
+        self._device = device
+        self.batch_size = batch_size
+        self.weights = list(weights)
+        self.max_passage_length = max_passage_length
+        self.use_fp16 = use_fp16
+        self._model = None
+
+    def _load_model(self):
+        """Lazy load the BGEM3FlagModel."""
+        if self._model is None:
+            try:
+                from FlagEmbedding import BGEM3FlagModel
+            except ImportError:
+                raise ImportError(
+                    "FlagEmbedding is required for BGEM3Reranker. "
+                    "Install it with: pip install FlagEmbedding"
+                )
+            kwargs = {"use_fp16": self.use_fp16}
+            if self._device:
+                # newer FlagEmbedding takes `devices`; older took `device`.
+                try:
+                    self._model = BGEM3FlagModel(self.model_name, devices=self._device, **kwargs)
+                except TypeError:
+                    self._model = BGEM3FlagModel(self.model_name, device=self._device, **kwargs)
+            else:
+                self._model = BGEM3FlagModel(self.model_name, **kwargs)
+            logger.info("Loaded bge-m3 multi-vector reranker: %s", self.model_name)
+        return self._model
+
+    def rerank(
+        self,
+        query: str,
+        citations: List[Citation],
+        top_k: Optional[int] = None,
+    ) -> List[Citation]:
+        """Rerank citations by combined dense+sparse+colbert similarity."""
+        if not citations:
+            return citations
+        if len(citations) == 1:
+            return citations[:top_k] if top_k else citations
+
+        model = self._load_model()
+        pairs = [[query, c.chunk] for c in citations]
+        try:
+            out = model.compute_score(
+                pairs,
+                batch_size=self.batch_size,
+                max_passage_length=self.max_passage_length,
+                weights_for_different_modes=self.weights,
+            )
+            scores = out["colbert+sparse+dense"]
+        except Exception as e:
+            logger.warning("bge-m3 rerank failed (%s); keeping input order", e)
+            return citations[:top_k] if top_k else citations
+
+        scored = [
+            Citation(source=c.source, chunk=c.chunk, score=float(s), metadata=c.metadata)
+            for c, s in zip(citations, scores)
+        ]
+        scored.sort(key=lambda c: c.score, reverse=True)
+        return scored[:top_k] if top_k is not None else scored
+
+
 class TFIDFReranker:
     """
     TF-IDF based reranker for fast keyword-aware reranking.

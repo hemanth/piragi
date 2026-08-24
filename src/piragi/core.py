@@ -249,12 +249,21 @@ class Ragi:
             )
 
         if self._use_cross_encoder:
-            from .reranker import CrossEncoderReranker
-            self._cross_encoder = CrossEncoderReranker(
-                model_name=self.config.retrieval.cross_encoder_model,
-                device=self.config.retrieval.cross_encoder_device or self.config.embedding.device,
-                trust_remote_code=self.config.retrieval.trust_remote_code,
-            )
+            ce_model = self.config.retrieval.cross_encoder_model or ""
+            ce_device = self.config.retrieval.cross_encoder_device or self.config.embedding.device
+            if "bge-m3" in ce_model.lower():
+                from .reranker import BGEM3Reranker
+                self._cross_encoder = BGEM3Reranker(
+                    model_name=ce_model,
+                    device=ce_device,
+                )
+            else:
+                from .reranker import CrossEncoderReranker
+                self._cross_encoder = CrossEncoderReranker(
+                    model_name=ce_model,
+                    device=ce_device,
+                    trust_remote_code=self.config.retrieval.trust_remote_code,
+                )
             if self.config.retrieval.warm_models:
                 try:
                     self._cross_encoder._load_model()

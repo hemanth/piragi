@@ -285,3 +285,37 @@ class QdrantStore:
         """Get all chunk texts for hybrid search."""
         return self._chunk_texts
 
+    def get_all_chunks(self) -> List[Dict[str, Any]]:
+        """Get all chunks as records (text/source/metadata) for hybrid indexing.
+
+        Lets BM25-only hits carry their source through fusion (parity with
+        LanceStore); without it, hybrid falls back to text-only records and
+        keyword-unique hits lose their source.
+        """
+        records: List[Dict[str, Any]] = []
+        offset = None
+        while True:
+            result, offset = self.client.scroll(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False,
+                limit=1000,
+                offset=offset,
+            )
+            for point in result:
+                payload = point.payload or {}
+                records.append(
+                    {
+                        "text": payload.get("text", ""),
+                        "source": payload.get("source"),
+                        "metadata": {
+                            k: v
+                            for k, v in payload.items()
+                            if k not in ("text", "source", "chunk_index")
+                        },
+                    }
+                )
+            if offset is None:
+                break
+        return records
+
