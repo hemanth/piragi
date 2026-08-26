@@ -81,6 +81,14 @@ class Ragi:
                         Chunks shorter than this are filtered out. Useful for removing
                         garbage chunks like navigation elements, short headers, etc.
                 - retrieval: Retrieval configuration
+                    - mode: Retrieval mode (default: "dense")
+                        Options: "dense" (pre-embed + vector store), "bm25_only" (no
+                        embeddings, keyword search only), "on_the_fly" (embed at query
+                        time, no pre-indexing - for high-churn corpora), "hot_cold"
+                        (pre-embed chunks tagged metadata={"tier": "hot"}, embed the rest
+                        on-the-fly)
+                    - use_query_rewrite: Rewrite conversational queries into keyword
+                        queries before lexical search (default: False)
                     - use_hyde: Enable HyDE (default: False)
                     - use_hybrid_search: Enable BM25 + vector hybrid (default: False)
                     - use_cross_encoder: Enable cross-encoder reranking (default: False)
@@ -202,7 +210,11 @@ class Ragi:
 
         # Embeddings - use provided embedder or create new one
         embed_model = self.config.embedding.model
-        if embedder is not None:
+        self._mode = self.config.retrieval.mode
+        needs_embedder = embedder is not None or self._mode != "bm25_only"
+        if not needs_embedder:
+            self.embedder = None
+        elif embedder is not None:
             self.embedder = embedder
             # Try to get model name from the provided embedder for store configuration
             if hasattr(embedder, "model_name"):
@@ -217,12 +229,12 @@ class Ragi:
                 batch_size=self.config.embedding.batch_size,
             )
 
-        # Vector store - supports multiple backends
+        # Vector store - supports multiple backends (unused in bm25_only mode)
         self.store = create_store(
             store=store,
             persist_dir=persist_dir,
             embedding_model=embed_model,
-        )
+        ) if self._mode != "bm25_only" else None
 
         # Retrieval configuration
         self._use_hyde = self.config.retrieval.use_hyde
@@ -233,6 +245,21 @@ class Ragi:
         self._hyde = None
         self._hybrid_searcher = None
         self._cross_encoder = None
+        self._query_rewriter = None
+        self._bm25_index = None
+        self._on_the_fly_index = None
+
+        if self.config.retrieval.use_query_rewrite:
+            from .query_transform import QueryRewriter
+            self._query_rewriter = QueryRewriter(llm_client=self.llm_client)
+
+        if self._mode == "bm25_only":
+            from .hybrid_search import BM25Index
+            self._bm25_index = BM25Index()
+
+        if self._mode in ("on_the_fly", "hot_cold"):
+            from .on_the_fly import OnTheFlyIndex
+            self._on_the_fly_index = OnTheFlyIndex()
 
         if self._use_hyde:
             from .query_transform import HyDE
@@ -308,6 +335,10 @@ class Ragi:
             cross_encoder=self._cross_encoder,
             graph=self._graph,
             use_hierarchical=self._use_hierarchical,
+            mode=self._mode,
+            query_rewriter=self._query_rewriter,
+            bm25_index=self._bm25_index,
+            on_the_fly_index=self._on_the_fly_index,
         )
 
         # Load initial sources if provided
@@ -363,6 +394,9 @@ class Ragi:
             post_chunk_hook=self._post_chunk_hook,
             post_embed_hook=self._post_embed_hook,
             use_hierarchical=self._use_hierarchical,
+            mode=self._mode,
+            bm25_index=self._bm25_index,
+            on_the_fly_index=self._on_the_fly_index,
         )
         
         # Determine the llm_client to pass for graph extraction
@@ -510,7 +544,13 @@ class Ragi:
 
     def count(self) -> int:
         """Return the number of chunks in the knowledge base."""
-        return self.store.count()
+        if self.store is not None:
+            return self.store.count()
+        if self._bm25_index is not None:
+            return self._bm25_index.count()
+        if self._on_the_fly_index is not None:
+            return self._on_the_fly_index.count()
+        return 0
 
     @property
     def graph(self):
@@ -549,21 +589,31 @@ class Ragi:
         # Load documents to get their actual source paths
         documents = self.loader.load(sources)
 
-        # Delete old chunks for each source
+        # Delete old chunks for each source, across whichever index is active
         for doc in documents:
-            deleted = self.store.delete_by_source(doc.source)
+            if self.store is not None:
+                self.store.delete_by_source(doc.source)
+            if self._bm25_index is not None:
+                self._bm25_index.delete_by_source(doc.source)
+            if self._on_the_fly_index is not None:
+                self._on_the_fly_index.delete_by_source(doc.source)
 
-        # Re-add the documents
-        all_chunks = []
-        for doc in documents:
-            chunks = self.chunker.chunk_document(doc)
-            all_chunks.extend(chunks)
-
-        # Generate embeddings
-        chunks_with_embeddings = self.embedder.embed_chunks(all_chunks)
-
-        # Store in vector database
-        self.store.add_chunks(chunks_with_embeddings)
+        # Re-add via the same embed/store branching add() uses, so refresh()
+        # behaves correctly under bm25_only/on_the_fly/hot_cold too
+        from .pipelines.ingestion import IngestionPipeline
+        pipeline = IngestionPipeline(
+            loader=self.loader,
+            chunker=self.chunker,
+            embedder=self.embedder,
+            store=self.store,
+            post_chunk_hook=self._post_chunk_hook,
+            post_embed_hook=self._post_embed_hook,
+            use_hierarchical=self._use_hierarchical,
+            mode=self._mode,
+            bm25_index=self._bm25_index,
+            on_the_fly_index=self._on_the_fly_index,
+        )
+        pipeline.ingest(sources)
 
         return self
 
@@ -574,7 +624,13 @@ class Ragi:
             self._updater.stop()
             self._tracked_sources.clear()
 
-        self.store.clear()
+        if self.store is not None:
+            self.store.clear()
+        if self._bm25_index is not None:
+            self._bm25_index._chunks = []
+            self._bm25_index._bm25 = None
+        if self._on_the_fly_index is not None:
+            self._on_the_fly_index.clear()
 
         # Clear knowledge graph if enabled
         if self._graph:

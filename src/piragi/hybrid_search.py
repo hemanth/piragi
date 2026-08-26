@@ -222,6 +222,73 @@ class HybridSearcher:
         return combined
 
 
+class BM25Index:
+    """
+    Standalone BM25 keyword index that returns full Citations on its own.
+
+    Unlike HybridSearcher (which reranks an existing set of vector results),
+    this indexes chunks directly and answers queries without any embeddings -
+    the "full-text search first" recipe: no vector store, no chunking-for-
+    embedding concerns, sub-10ms lookups.
+    """
+
+    def __init__(self) -> None:
+        self._bm25: Optional[BM25Okapi] = None
+        self._chunks: List[Citation] = []
+
+    def _tokenize(self, text: str) -> List[str]:
+        import re
+        tokens = re.findall(r"\b\w+\b", text.lower())
+        return [t for t in tokens if len(t) > 1]
+
+    def index_chunks(self, chunks: List[Citation]) -> None:
+        """
+        Index chunks as Citations for standalone BM25 search.
+
+        Args:
+            chunks: Citations to index (source/chunk/metadata used, score ignored)
+        """
+        self._chunks.extend(chunks)
+        tokenized_corpus = [self._tokenize(c.chunk) for c in self._chunks]
+        self._bm25 = BM25Okapi(tokenized_corpus) if tokenized_corpus else None
+        logger.info(f"BM25-only index now holds {len(self._chunks)} chunks")
+
+    def search(self, query: str, top_k: int = 10) -> List[Citation]:
+        """Search the index and return top_k Citations with BM25 scores."""
+        if self._bm25 is None or not self._chunks:
+            return []
+
+        scores = self._bm25.get_scores(self._tokenize(query))
+        max_score = max(scores) if len(scores) and max(scores) > 0 else 1.0
+
+        ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+        results = []
+        for idx in ranked[:top_k]:
+            source_chunk = self._chunks[idx]
+            results.append(
+                Citation(
+                    source=source_chunk.source,
+                    chunk=source_chunk.chunk,
+                    score=scores[idx] / max_score,
+                    metadata=source_chunk.metadata,
+                )
+            )
+        return results
+
+    def count(self) -> int:
+        return len(self._chunks)
+
+    def delete_by_source(self, source: str) -> int:
+        """Delete all chunks from a specific source. Returns number deleted."""
+        before = len(self._chunks)
+        self._chunks = [c for c in self._chunks if c.source != source]
+        deleted = before - len(self._chunks)
+        if deleted:
+            tokenized_corpus = [self._tokenize(c.chunk) for c in self._chunks]
+            self._bm25 = BM25Okapi(tokenized_corpus) if tokenized_corpus else None
+        return deleted
+
+
 def create_hybrid_searcher(
     vector_weight: float = 0.5,
     bm25_weight: float = 0.5,

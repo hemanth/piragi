@@ -1,0 +1,16 @@
+[
+  {"query": "AUTH_4011 error code", "expected_source": "auth.md"},
+  {"query": "how do I rotate a leaked API key", "expected_source": "auth.md"},
+  {"query": "what's the rate limit before AUTH_4291", "expected_source": "auth.md"},
+  {"query": "InvoiceBatchJob schedule", "expected_source": "billing.md"},
+  {"query": "when does a failed charge get marked DUNNING_PENDING", "expected_source": "billing.md"},
+  {"query": "refund approval threshold for large refunds", "expected_source": "billing.md"},
+  {"query": "CACHE_TTL_SECONDS default value", "expected_source": "caching.md"},
+  {"query": "how are session cache keys namespaced", "expected_source": "caching.md"},
+  {"query": "what happens on a cache miss for sessions", "expected_source": "caching.md"},
+  {"query": "canary rollback p99_latency_ms threshold", "expected_source": "deployment.md"},
+  {"query": "how do I manually roll back a deployment", "expected_source": "deployment.md"},
+  {"query": "PUSH_TTL_SECONDS default", "expected_source": "notifications.md"},
+  {"query": "how can a user mute a notification category", "expected_source": "notifications.md"},
+  {"query": "which adapter handles SMS delivery retries", "expected_source": "notifications.md"}
+]

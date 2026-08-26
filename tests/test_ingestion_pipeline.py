@@ -140,17 +140,161 @@ def test_ingestion_returns_count():
 def test_ragi_add_uses_pipeline(tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("This is a test document.")
-    
+
     kb = Ragi(persist_dir=str(tmp_path / ".piragi"))
-    
+
     # Store initial count
     initial_count = kb.count()
-    
+
     kb.add(str(test_file))
-    
+
     # Verify count increased
     assert kb.count() > initial_count
-    
+
     # Verify we can query
     ans = kb.ask("test document")
     assert ans is not None
+
+
+def _text_chunk(source="test.txt", text="chunk text"):
+    """A chunk-like Mock with real str/dict attrs (Citation validates types)."""
+    chunk = Mock()
+    chunk.source = source
+    chunk.text = text
+    chunk.metadata = {}
+    return chunk
+
+
+def test_ingestion_bm25_only_mode_skips_embedding():
+    loader = Mock()
+    chunker = Mock()
+    embedder = Mock()
+    store = Mock()
+    bm25_index = Mock()
+
+    doc = Mock()
+    doc.source = "test.txt"
+    loader.stream.return_value = [doc]
+
+    chunk = _text_chunk()
+    chunker.chunk_document.return_value = [chunk]
+
+    pipeline = IngestionPipeline(
+        loader, chunker, embedder, store, mode="bm25_only", bm25_index=bm25_index
+    )
+    count = pipeline.ingest(["test.txt"])
+
+    embedder.embed_chunks.assert_not_called()
+    store.add_chunks.assert_not_called()
+    bm25_index.index_chunks.assert_called_once()
+    indexed = bm25_index.index_chunks.call_args[0][0]
+    assert indexed[0].source == "test.txt"
+    assert indexed[0].chunk == "chunk text"
+    assert count == 1
+
+
+def test_ingestion_on_the_fly_mode_skips_embedding():
+    loader = Mock()
+    chunker = Mock()
+    embedder = Mock()
+    store = Mock()
+    on_the_fly_index = Mock()
+
+    doc = Mock()
+    doc.source = "test.txt"
+    loader.stream.return_value = [doc]
+
+    chunk = _text_chunk()
+    chunker.chunk_document.return_value = [chunk]
+
+    pipeline = IngestionPipeline(
+        loader, chunker, embedder, store,
+        mode="on_the_fly", on_the_fly_index=on_the_fly_index,
+    )
+    count = pipeline.ingest(["test.txt"])
+
+    embedder.embed_chunks.assert_not_called()
+    store.add_chunks.assert_not_called()
+    on_the_fly_index.add_chunks.assert_called_once_with([chunk])
+    assert count == 1
+
+
+def test_ingestion_hot_cold_mode_routes_by_tier():
+    loader = Mock()
+    chunker = Mock()
+    embedder = Mock()
+    store = Mock()
+    on_the_fly_index = Mock()
+
+    doc = Mock()
+    doc.source = "test.txt"
+    loader.stream.return_value = [doc]
+
+    hot_chunk = _text_chunk(text="hot")
+    hot_chunk.metadata = {"tier": "hot"}
+    cold_chunk = _text_chunk(text="cold")
+    cold_chunk.metadata = {"tier": "cold"}
+    chunker.chunk_document.return_value = [hot_chunk, cold_chunk]
+
+    embedder.embed_chunks.return_value = ["hot_embedded"]
+
+    pipeline = IngestionPipeline(
+        loader, chunker, embedder, store,
+        mode="hot_cold", on_the_fly_index=on_the_fly_index,
+    )
+    count = pipeline.ingest(["test.txt"])
+
+    embedder.embed_chunks.assert_called_once_with([hot_chunk], on_progress=ANY)
+    store.add_chunks.assert_called_once_with(["hot_embedded"])
+    on_the_fly_index.add_chunks.assert_called_once_with([cold_chunk])
+    assert count == 2  # 1 hot embedded + 1 cold
+
+
+def test_ingestion_hot_cold_mode_skips_store_when_no_hot_chunks():
+    loader = Mock()
+    chunker = Mock()
+    embedder = Mock()
+    store = Mock()
+    on_the_fly_index = Mock()
+
+    doc = Mock()
+    doc.source = "test.txt"
+    loader.stream.return_value = [doc]
+
+    cold_chunk = _text_chunk(text="cold")
+    cold_chunk.metadata = {"tier": "cold"}
+    chunker.chunk_document.return_value = [cold_chunk]
+
+    pipeline = IngestionPipeline(
+        loader, chunker, embedder, store,
+        mode="hot_cold", on_the_fly_index=on_the_fly_index,
+    )
+    pipeline.ingest(["test.txt"])
+
+    embedder.embed_chunks.assert_not_called()
+    store.add_chunks.assert_not_called()
+    on_the_fly_index.add_chunks.assert_called_once_with([cold_chunk])
+
+
+def test_ingestion_hybrid_indexing_skipped_for_non_dense_modes():
+    """The dense-only hybrid_searcher.index_chunks() re-indexing step (step 7) must
+    not fire for bm25_only/on_the_fly/hot_cold - they build their own index instead."""
+    loader = Mock()
+    chunker = Mock()
+    embedder = Mock()
+    store = Mock()
+    bm25_index = Mock()
+    hybrid_searcher = Mock()
+
+    doc = Mock()
+    doc.source = "test.txt"
+    loader.stream.return_value = [doc]
+    chunker.chunk_document.return_value = [_text_chunk()]
+
+    pipeline = IngestionPipeline(
+        loader, chunker, embedder, store,
+        mode="bm25_only", bm25_index=bm25_index, hybrid_searcher=hybrid_searcher,
+    )
+    pipeline.ingest(["test.txt"])
+
+    hybrid_searcher.index_chunks.assert_not_called()

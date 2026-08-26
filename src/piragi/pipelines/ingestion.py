@@ -9,7 +9,8 @@ class IngestionPipeline:
     def __init__(self, loader, chunker, embedder, store,
                  graph=None, hybrid_searcher=None,
                  post_load_hook=None, post_chunk_hook=None, post_embed_hook=None,
-                 use_hierarchical=False):
+                 use_hierarchical=False, mode="dense",
+                 bm25_index=None, on_the_fly_index=None):
         self.loader = loader
         self.chunker = chunker
         self.embedder = embedder
@@ -20,6 +21,9 @@ class IngestionPipeline:
         self.post_chunk_hook = post_chunk_hook
         self.post_embed_hook = post_embed_hook
         self.use_hierarchical = use_hierarchical
+        self.mode = mode
+        self.bm25_index = bm25_index
+        self.on_the_fly_index = on_the_fly_index
     
     def ingest(self, sources, on_progress=None, llm_client=None):
         """Run the full ingestion pipeline.
@@ -59,23 +63,51 @@ class IngestionPipeline:
         # 2. Post-chunk hook
         if self.post_chunk_hook:
             all_chunks = self.post_chunk_hook(all_chunks)
-        
-        # 3. Embed
-        _progress("Generating embeddings for {} chunks...".format(len(all_chunks)))
-        chunks_with_embeddings = self.embedder.embed_chunks(all_chunks, on_progress=_progress)
-        
-        # 4. Post-embed hook
-        if self.post_embed_hook:
-            chunks_with_embeddings = self.post_embed_hook(chunks_with_embeddings)
-        
-        # 5. Store
-        _progress("Storing {} chunks...".format(len(chunks_with_embeddings)))
-        # Store might use add() or add_chunks()
-        if hasattr(self.store, "add_chunks"):
-            self.store.add_chunks(chunks_with_embeddings)
+
+        # 3-5. Embed + store, branching on retrieval mode
+        if self.mode == "bm25_only":
+            from ..types import Citation
+            _progress("Indexing {} chunks for BM25 (no embeddings)...".format(len(all_chunks)))
+            self.bm25_index.index_chunks([
+                Citation(source=c.source, chunk=c.text, score=0.0, metadata=c.metadata)
+                for c in all_chunks
+            ])
+            chunks_with_embeddings = all_chunks
+        elif self.mode == "on_the_fly":
+            _progress("Adding {} chunks for on-the-fly embedding...".format(len(all_chunks)))
+            self.on_the_fly_index.add_chunks(all_chunks)
+            chunks_with_embeddings = all_chunks
+        elif self.mode == "hot_cold":
+            hot_chunks = [c for c in all_chunks if c.metadata.get("tier") == "hot"]
+            cold_chunks = [c for c in all_chunks if c.metadata.get("tier") != "hot"]
+
+            _progress("Pre-embedding {} hot chunks...".format(len(hot_chunks)))
+            hot_embedded = self.embedder.embed_chunks(hot_chunks, on_progress=_progress) if hot_chunks else []
+            if self.post_embed_hook and hot_embedded:
+                hot_embedded = self.post_embed_hook(hot_embedded)
+            if hot_embedded:
+                (self.store.add_chunks if hasattr(self.store, "add_chunks") else self.store.add)(hot_embedded)
+
+            _progress("Adding {} cold chunks for on-the-fly embedding...".format(len(cold_chunks)))
+            if cold_chunks:
+                self.on_the_fly_index.add_chunks(cold_chunks)
+
+            chunks_with_embeddings = hot_embedded + cold_chunks
         else:
-            self.store.add(chunks_with_embeddings)
-        
+            # Dense (default): embed everything up front and store in the vector store
+            _progress("Generating embeddings for {} chunks...".format(len(all_chunks)))
+            chunks_with_embeddings = self.embedder.embed_chunks(all_chunks, on_progress=_progress)
+
+            if self.post_embed_hook:
+                chunks_with_embeddings = self.post_embed_hook(chunks_with_embeddings)
+
+            _progress("Storing {} chunks...".format(len(chunks_with_embeddings)))
+            # Store might use add() or add_chunks()
+            if hasattr(self.store, "add_chunks"):
+                self.store.add_chunks(chunks_with_embeddings)
+            else:
+                self.store.add(chunks_with_embeddings)
+
         # 6. Graph extraction
         if self.graph and llm_client:
             _progress("Extracting knowledge graph...")
@@ -86,11 +118,11 @@ class IngestionPipeline:
                     model=getattr(llm_client, "model", "default")
                 )
             self.graph.save()
-        
-        # 7. Hybrid search indexing
-        if self.hybrid_searcher:
+
+        # 7. Hybrid search indexing (dense mode only - other modes build their own index above)
+        if self.hybrid_searcher and self.mode == "dense":
             chunk_texts = self.store.get_all_chunk_texts()
             self.hybrid_searcher.index_chunks(chunk_texts)
-        
+
         _progress("Done")
         return len(chunks_with_embeddings)

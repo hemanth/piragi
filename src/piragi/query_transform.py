@@ -310,6 +310,78 @@ class MultiQueryRetriever:
         return queries
 
 
+class QueryRewriter:
+    """
+    Agentic query rewriting for keyword search.
+
+    Turns a conversational query into a short, dense keyword query optimized
+    for lexical search (BM25). Most "semantic search" problems are actually
+    query formulation problems - this fixes the query instead of the retriever.
+    """
+
+    def __init__(
+        self,
+        model: str = "llama3.2",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        llm_client=None,
+    ) -> None:
+        """Initialize the query rewriter."""
+        import os
+
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = llm_client.client
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
+
+    def rewrite(self, query: str) -> str:
+        """
+        Rewrite a conversational query into a keyword search query.
+
+        Args:
+            query: Original, possibly conversational query
+
+        Returns:
+            Short keyword query, or the original query if rewriting fails
+        """
+        prompt = f"""Rewrite this question as a short keyword search query for a full-text search engine.
+Keep domain-specific terms, names, and jargon exactly as written. Drop filler words like "how do I" or "what is".
+
+Question: {query}
+
+Keyword query:"""
+
+        try:
+            response = self.llm_client.complete(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You convert questions into short keyword search queries. Return only the keywords, nothing else.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.0,
+                max_tokens=32,
+            )
+
+            rewritten = (response.choices[0].message.content or "").strip().strip('"')
+            return rewritten or query
+
+        except Exception as e:
+            logger.warning(f"Query rewrite failed: {e}, using original query")
+            return query
+
+
 class StepBackPrompting:
     """
     Step-back prompting for complex queries.

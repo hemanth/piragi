@@ -8,6 +8,7 @@ from piragi.query_transform import (
     QueryExpander,
     MultiQueryRetriever,
     StepBackPrompting,
+    QueryRewriter,
 )
 
 
@@ -314,3 +315,56 @@ class TestStepBackPrompting:
         assert len(results) == 2
         assert results[0] == "Specific query"  # Original first
         assert results[1] == "General question"  # Step-back second
+
+
+class TestQueryRewriter:
+    """Tests for agentic query rewriting."""
+
+    def _mock_llm_client(self, content):
+        client = MagicMock()
+        response = MagicMock()
+        response.choices = [MagicMock()]
+        response.choices[0].message.content = content
+        client.complete.return_value = response
+        return client
+
+    def test_init_with_llm_client(self):
+        """Test initialization reuses a provided llm_client instead of creating one."""
+        llm_client = MagicMock()
+        llm_client.model = "gemma4:latest"
+        rewriter = QueryRewriter(llm_client=llm_client)
+
+        assert rewriter.llm_client is llm_client
+        assert rewriter.model == "gemma4:latest"
+
+    def test_rewrite_returns_keyword_query(self):
+        """Test rewrite() returns the model's keyword query, stripped of quotes."""
+        llm_client = self._mock_llm_client('"AUTH_4011 rate limit"')
+        rewriter = QueryRewriter(llm_client=llm_client)
+
+        result = rewriter.rewrite("what's the rate limit before AUTH_4011")
+
+        assert result == "AUTH_4011 rate limit"
+        llm_client.complete.assert_called_once()
+
+    def test_rewrite_fallback_on_error(self):
+        """Test rewrite() falls back to the original query if the LLM call fails."""
+        llm_client = MagicMock()
+        llm_client.model = "llama3.2"
+        llm_client.complete.side_effect = Exception("connection refused")
+        rewriter = QueryRewriter(llm_client=llm_client)
+
+        query = "how do I rotate a leaked API key"
+        result = rewriter.rewrite(query)
+
+        assert result == query
+
+    def test_rewrite_falls_back_to_original_on_empty_response(self):
+        """Test rewrite() returns original query if the model returns nothing."""
+        llm_client = self._mock_llm_client("")
+        rewriter = QueryRewriter(llm_client=llm_client)
+
+        query = "how are session cache keys namespaced"
+        result = rewriter.rewrite(query)
+
+        assert result == query

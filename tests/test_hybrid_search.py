@@ -1,7 +1,7 @@
 """Tests for hybrid search (BM25 + vector) functionality."""
 
 import pytest
-from piragi.hybrid_search import HybridSearcher, create_hybrid_searcher
+from piragi.hybrid_search import HybridSearcher, BM25Index, create_hybrid_searcher
 from piragi.types import Citation
 
 
@@ -134,3 +134,68 @@ class TestCreateHybridSearcher:
         assert searcher.vector_weight == 0.8
         assert searcher.bm25_weight == 0.2
         assert searcher.use_rrf is False
+
+
+class TestBM25Index:
+    """Tests for the standalone BM25-only index (no vector store involved)."""
+
+    def _citations(self, sample_corpus):
+        return [
+            Citation(source=f"doc{i}.txt", chunk=text, score=0.0, metadata={"index": i})
+            for i, text in enumerate(sample_corpus)
+        ]
+
+    def test_search_before_indexing_returns_empty(self):
+        """Test searching an empty index returns no results instead of erroring."""
+        index = BM25Index()
+        assert index.search("Python") == []
+        assert index.count() == 0
+
+    def test_index_and_search_returns_relevant_chunks(self, sample_corpus):
+        """Test that indexing then searching surfaces the matching chunk(s) first."""
+        index = BM25Index()
+        index.index_chunks(self._citations(sample_corpus))
+
+        results = index.search("Python programming", top_k=2)
+
+        assert len(results) <= 2
+        assert results[0].source == "doc0.txt"
+
+    def test_search_scores_normalized_to_max_one(self, sample_corpus):
+        """Test scores are normalized against the top score (article's BM25 recipe assumes 0-1 scores)."""
+        index = BM25Index()
+        index.index_chunks(self._citations(sample_corpus))
+
+        results = index.search("Python", top_k=6)
+
+        assert results[0].score == pytest.approx(1.0)
+        assert all(0.0 <= r.score <= 1.0 for r in results)
+
+    def test_index_chunks_is_additive(self, sample_corpus):
+        """Test repeated index_chunks() calls accumulate rather than overwrite."""
+        index = BM25Index()
+        index.index_chunks(self._citations(sample_corpus[:2]))
+        index.index_chunks(self._citations(sample_corpus[2:]))
+
+        assert index.count() == len(sample_corpus)
+
+    def test_delete_by_source_removes_matching_chunks(self, sample_corpus):
+        """Test delete_by_source() drops only chunks from that source, matching store's contract."""
+        index = BM25Index()
+        index.index_chunks(self._citations(sample_corpus))
+
+        deleted = index.delete_by_source("doc0.txt")
+
+        assert deleted == 1
+        assert index.count() == len(sample_corpus) - 1
+        assert all(c.source != "doc0.txt" for c in index._chunks)
+
+    def test_delete_by_source_missing_source_is_noop(self, sample_corpus):
+        """Test delete_by_source() for an unknown source deletes nothing."""
+        index = BM25Index()
+        index.index_chunks(self._citations(sample_corpus))
+
+        deleted = index.delete_by_source("nonexistent.txt")
+
+        assert deleted == 0
+        assert index.count() == len(sample_corpus)

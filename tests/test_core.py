@@ -1,7 +1,7 @@
 """Tests for core Ragi class."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import numpy as np
 import pytest
@@ -313,3 +313,95 @@ class TestRagiUtility:
 
         kb.clear()
         assert kb.count() == 0
+
+
+class TestRagiRefresh:
+    """Tests for refresh() across retrieval modes.
+
+    AutoTokenizer.from_pretrained is patched because Chunker() always loads a
+    tokenizer at construction time regardless of embedding config - unrelated
+    to what refresh() itself does, but required to construct a Ragi() at all
+    in an offline/sandboxed test environment.
+    """
+
+    @patch("piragi.chunking.AutoTokenizer")
+    @patch("piragi.core.EmbeddingGenerator")
+    def test_refresh_dense_mode_deletes_and_reingests(
+        self, mock_embed_gen, mock_tokenizer, temp_dir, sample_text_file, mock_embeddings
+    ):
+        mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir)
+
+        doc = MagicMock()
+        doc.source = sample_text_file
+        kb.loader = MagicMock()
+        kb.loader.load.return_value = [doc]
+        kb.store = MagicMock()
+
+        with patch("piragi.pipelines.ingestion.IngestionPipeline") as MockPipeline:
+            pipeline_instance = MockPipeline.return_value
+            result = kb.refresh(sample_text_file)
+
+        kb.loader.load.assert_called_once_with(sample_text_file)
+        kb.store.delete_by_source.assert_called_once_with(sample_text_file)
+        MockPipeline.assert_called_once_with(
+            loader=kb.loader,
+            chunker=kb.chunker,
+            embedder=kb.embedder,
+            store=kb.store,
+            post_chunk_hook=kb._post_chunk_hook,
+            post_embed_hook=kb._post_embed_hook,
+            use_hierarchical=kb._use_hierarchical,
+            mode=kb._mode,
+            bm25_index=kb._bm25_index,
+            on_the_fly_index=kb._on_the_fly_index,
+        )
+        pipeline_instance.ingest.assert_called_once_with(sample_text_file)
+        assert result is kb
+
+    @patch("piragi.chunking.AutoTokenizer")
+    @patch("piragi.core.EmbeddingGenerator")
+    def test_refresh_bm25_only_mode_deletes_from_bm25_index_not_store(
+        self, mock_embed_gen, mock_tokenizer, temp_dir, sample_text_file, mock_embeddings
+    ):
+        mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir, config={"retrieval": {"mode": "bm25_only"}})
+        assert kb.store is None  # bm25_only mode has no vector store
+
+        doc = MagicMock()
+        doc.source = sample_text_file
+        kb.loader = MagicMock()
+        kb.loader.load.return_value = [doc]
+        kb._bm25_index = MagicMock()
+
+        with patch("piragi.pipelines.ingestion.IngestionPipeline") as MockPipeline:
+            pipeline_instance = MockPipeline.return_value
+            kb.refresh(sample_text_file)
+
+        kb._bm25_index.delete_by_source.assert_called_once_with(sample_text_file)
+        pipeline_instance.ingest.assert_called_once_with(sample_text_file)
+
+    @patch("piragi.chunking.AutoTokenizer")
+    @patch("piragi.core.EmbeddingGenerator")
+    def test_refresh_deletes_per_source_for_multiple_documents(
+        self, mock_embed_gen, mock_tokenizer, temp_dir, sample_text_file, mock_embeddings
+    ):
+        mock_embed_gen.return_value = create_mock_embedding_generator(mock_embeddings)
+
+        persist_dir = os.path.join(temp_dir, "test_ragi")
+        kb = Ragi(persist_dir=persist_dir)
+
+        doc1, doc2 = MagicMock(), MagicMock()
+        doc1.source, doc2.source = "a.txt", "b.txt"
+        kb.loader = MagicMock()
+        kb.loader.load.return_value = [doc1, doc2]
+        kb.store = MagicMock()
+
+        with patch("piragi.pipelines.ingestion.IngestionPipeline"):
+            kb.refresh(["a.txt", "b.txt"])
+
+        assert kb.store.delete_by_source.call_args_list == [call("a.txt"), call("b.txt")]

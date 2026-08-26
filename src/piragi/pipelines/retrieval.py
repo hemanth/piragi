@@ -9,9 +9,10 @@ class RetrievalPipeline:
     
     def __init__(self, embedder, store, retriever,
                  hyde=None, hybrid_searcher=None, cross_encoder=None,
-                 graph=None, use_hierarchical=False, max_parallel_queries=4):
+                 graph=None, use_hierarchical=False, max_parallel_queries=4,
+                 mode="dense", query_rewriter=None, bm25_index=None, on_the_fly_index=None):
         self.embedder = embedder
-        self.store = store  
+        self.store = store
         self.retriever = retriever
         self.hyde = hyde
         self.hybrid_searcher = hybrid_searcher
@@ -19,6 +20,10 @@ class RetrievalPipeline:
         self.graph = graph
         self.use_hierarchical = use_hierarchical
         self.max_parallel_queries = max_parallel_queries
+        self.mode = mode
+        self.query_rewriter = query_rewriter
+        self.bm25_index = bm25_index
+        self.on_the_fly_index = on_the_fly_index
         
     def _expand_to_parent_context(self, citations: List) -> List:
         """
@@ -53,16 +58,61 @@ class RetrievalPipeline:
             filters=filters,
         )
 
+    def _rewrite_if_enabled(self, query: str) -> str:
+        """Apply agentic query rewriting for lexical search, if configured."""
+        if not self.query_rewriter:
+            return query
+        try:
+            return self.query_rewriter.rewrite(query)
+        except Exception as e:
+            logger.warning("Query rewrite failed: {}, using original query".format(e))
+            return query
+
+    def _non_dense_search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None) -> List:
+        """Retrieval for bm25_only / on_the_fly / hot_cold modes (no pre-built vector index)."""
+        search_query = self._rewrite_if_enabled(query)
+
+        if self.mode == "bm25_only":
+            citations = self.bm25_index.search(search_query, top_k=top_k)
+        elif self.mode == "on_the_fly":
+            citations = self.on_the_fly_index.search(self.embedder, search_query, top_k=top_k)
+        elif self.mode == "hot_cold":
+            hot_citations = self.store.search(
+                query_embedding=self.embedder.embed_query(search_query),
+                top_k=top_k,
+                filters=filters,
+            )
+            cold_citations = (
+                self.on_the_fly_index.search(self.embedder, search_query, top_k=top_k)
+                if self.on_the_fly_index and self.on_the_fly_index.count()
+                else []
+            )
+            citations = sorted(hot_citations + cold_citations, key=lambda c: c.score, reverse=True)[:top_k]
+        else:
+            citations = []
+
+        if self.cross_encoder:
+            try:
+                citations = self.cross_encoder.rerank(query=query, citations=citations, top_k=top_k)
+            except Exception as e:
+                logger.warning("Cross-encoder reranking failed: {}".format(e))
+                citations = citations[:top_k]
+
+        if self.use_hierarchical:
+            citations = self._expand_to_parent_context(citations)
+
+        return citations
+
     def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict[str, Any]] = None):
         """Retrieve relevant chunks for a query.
-        
+
         Steps:
         1. Transform query (HyDE / multi-query expansion)
         2. Vector search (with optional filters)
         3. Hybrid search fusion (if enabled)
         4. Cross-encoder reranking (if enabled)
         5. Hierarchical context expansion (if enabled)
-        
+
         Returns:
             List of Citation objects
         """
@@ -71,6 +121,9 @@ class RetrievalPipeline:
         # Validate query
         if not query or not query.strip():
             return []
+
+        if self.mode in ("bm25_only", "on_the_fly", "hot_cold"):
+            return self._non_dense_search(query, top_k, filters)
 
         # Determine queries to use for retrieval
         if self.hyde:
@@ -115,7 +168,7 @@ class RetrievalPipeline:
         if self.hybrid_searcher:
             try:
                 all_citations = self.hybrid_searcher.search(
-                    query=query,
+                    query=self._rewrite_if_enabled(query),
                     vector_citations=all_citations,
                     top_k=search_top_k,
                 )
@@ -144,14 +197,33 @@ class RetrievalPipeline:
 
         return all_citations
     
+    def _generate_answer_from_citations(self, query: str, citations: List, system_prompt: Optional[str] = None):
+        """Shared tail of ask(): graph context + LLM generation from already-retrieved citations."""
+        graph_context = ""
+        if self.graph:
+            graph_context = self.graph.to_context(query, max_triples=10)
+
+        final_system_prompt = system_prompt
+        if graph_context:
+            if final_system_prompt:
+                final_system_prompt = "{}\n\n{}".format(final_system_prompt, graph_context)
+            else:
+                final_system_prompt = graph_context
+
+        return self.retriever.generate_answer(
+            query=query,
+            citations=citations,
+            system_prompt=final_system_prompt,
+        )
+
     def ask(self, query: str, top_k: int = 5, system_prompt: Optional[str] = None, filters: Optional[Dict[str, Any]] = None):
         """Retrieve and generate an answer.
-        
+
         Steps:
         1. Retrieve relevant chunks
         2. Build context from chunks
         3. Generate answer via LLM
-        
+
         Returns:
             Answer object with citations
         """
@@ -164,6 +236,10 @@ class RetrievalPipeline:
                 citations=[],
                 query=query,
             )
+
+        if self.mode in ("bm25_only", "on_the_fly", "hot_cold"):
+            citations = self._non_dense_search(query, top_k, filters)
+            return self._generate_answer_from_citations(query, citations, system_prompt)
 
         # Determine queries to use for retrieval
         if self.hyde:
@@ -209,7 +285,7 @@ class RetrievalPipeline:
         if self.hybrid_searcher:
             try:
                 all_citations = self.hybrid_searcher.search(
-                    query=query,  # Use original query for BM25
+                    query=self._rewrite_if_enabled(query),  # Use rewritten query for BM25
                     vector_citations=all_citations,
                     top_k=search_top_k,
                 )
@@ -241,24 +317,4 @@ class RetrievalPipeline:
         if self.use_hierarchical:
             final_citations = self._expand_to_parent_context(final_citations)
 
-        # Add graph context if enabled
-        graph_context = ""
-        if self.graph:
-            graph_context = self.graph.to_context(query, max_triples=10)
-
-        # Build system prompt with graph context
-        final_system_prompt = system_prompt
-        if graph_context:
-            if final_system_prompt:
-                final_system_prompt = "{}\n\n{}".format(final_system_prompt, graph_context)
-            else:
-                final_system_prompt = graph_context
-
-        # Generate answer
-        answer = self.retriever.generate_answer(
-            query=query,
-            citations=final_citations,
-            system_prompt=final_system_prompt,
-        )
-
-        return answer
+        return self._generate_answer_from_citations(query, final_citations, system_prompt)

@@ -33,9 +33,11 @@ class ChunkConfig(BaseModel):
 
 class RetrievalConfig(BaseModel):
     model_config = {"extra": "forbid"}
+    mode: str = "dense"  # "dense" | "bm25_only" | "on_the_fly" | "hot_cold"
     use_hyde: bool = False
     use_hybrid_search: bool = False
     use_cross_encoder: bool = False
+    use_query_rewrite: bool = False
     vector_weight: float = 0.5
     bm25_weight: float = 0.5
     use_rrf: bool = True
