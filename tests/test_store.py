@@ -64,6 +64,8 @@ class TestGetEmbeddingDimension:
         assert get_embedding_dimension("nvidia/llama-embed-nemotron-8b") == 4096
         assert get_embedding_dimension("text-embedding-3-small") == 1536
         assert get_embedding_dimension("BAAI/bge-large-en-v1.5") == 1024
+        assert get_embedding_dimension("google/embeddinggemma-2") == 768
+        assert get_embedding_dimension("embeddinggemma-2") == 768
 
     def test_partial_match(self):
         """Test dimension lookup with partial model names."""

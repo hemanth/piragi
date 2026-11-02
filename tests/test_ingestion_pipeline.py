@@ -142,6 +142,7 @@ def test_ragi_add_uses_pipeline(tmp_path):
     test_file.write_text("This is a test document.")
 
     kb = Ragi(persist_dir=str(tmp_path / ".piragi"))
+    kb.retriever._generate_with_llm = Mock(return_value="This is a test answer [1].")
 
     # Store initial count
     initial_count = kb.count()

@@ -85,3 +85,18 @@ def mock_llm_env(monkeypatch):
     """Mock LLM environment variables for tests."""
     monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434/v1")
     monkeypatch.setenv("LLM_API_KEY", "not-needed")
+
+
+def pytest_configure(config):
+    """Disable cov-fail-under when running targeted single test files."""
+    args = getattr(config, "args", [])
+    # If explicit test file paths (e.g. tests/test_*.py) are supplied, do not fail whole-suite coverage
+    if any(arg.endswith(".py") or "::" in arg for arg in args):
+        cov = config.pluginmanager.get_plugin("_cov")
+        if cov:
+            cov.options.cov_fail_under = None
+            cov.options.no_cov = True
+        if hasattr(config.option, "cov_fail_under"):
+            config.option.cov_fail_under = None
+        if hasattr(config.option, "no_cov"):
+            config.option.no_cov = True

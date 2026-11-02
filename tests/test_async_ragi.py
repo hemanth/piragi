@@ -57,6 +57,7 @@ async def test_async_ragi_init(mock_ragi):
         store=None,
         graph=True,
         embedder=None,
+        decision_engine=None,
     )
 
 
@@ -79,6 +80,7 @@ async def test_async_ragi_init_with_embedder(mock_ragi):
         store=None,
         graph=False,
         embedder=mock_embedder,
+        decision_engine=None,
     )
 
 
@@ -173,16 +175,16 @@ async def test_async_ragi_refresh(mock_ragi):
 
 @pytest.mark.asyncio
 async def test_async_ragi_filter(mock_ragi):
-    """Test filter method (sync, returns self)."""
+    """Test filter method returns AsyncFilteredRagi."""
     mock_class, mock_instance = mock_ragi
 
-    from piragi.async_ragi import AsyncRagi
+    from piragi.async_ragi import AsyncRagi, AsyncFilteredRagi
 
     kb = AsyncRagi()
     result = kb.filter(type="docs", source="api.md")
 
-    mock_instance.filter.assert_called_once_with(type="docs", source="api.md")
-    assert result is kb
+    assert isinstance(result, AsyncFilteredRagi)
+    assert result._filters == {"type": "docs", "source": "api.md"}
 
 
 @pytest.mark.asyncio
