@@ -1,0 +1,89 @@
+{
+  "benchmark": "piragi-gcp-performance-evaluation",
+  "timestamp": "2026-10-31T23:17:17Z",
+  "environment": {
+    "verified": true,
+    "project_id": "hemanth-hm",
+    "location": "us-central1",
+    "adc_valid": true,
+    "vertex_accessible": true,
+    "gcs_accessible": true,
+    "token_prefix": "ya29.a0Aeh..."
+  },
+  "results": {
+    "baseline": {
+      "configuration": "Baseline (Local MiniLM + Local LanceDB)",
+      "indexing": {
+        "documents_count": 12,
+        "chunks_count": 12,
+        "indexing_time_sec": 1.8308,
+        "throughput_chunks_per_sec": 6.55
+      },
+      "query_latency_ms": {
+        "mean": 57.77,
+        "p50": 16.91,
+        "p95": 324.32,
+        "p99": 347.36,
+        "min": 14.72,
+        "max": 350.56,
+        "total_queries_executed": 36
+      },
+      "retrieval_accuracy": {
+        "recall@1": 0.6296,
+        "recall@5": 0.8333,
+        "recall@10": 0.8889,
+        "mrr": 0.7681
+      },
+      "memory_mb": {
+        "initial_rss": 540.52,
+        "post_index_rss": 826.86,
+        "peak_rss": 900.06,
+        "delta_rss": 359.55
+      }
+    },
+    "gcp_optimized": {
+      "configuration": "GCP Optimized (Vertex AI text-embedding-004 + LanceDB GCS)",
+      "indexing": {
+        "documents_count": 12,
+        "chunks_count": 12,
+        "indexing_time_sec": 1.5536,
+        "throughput_chunks_per_sec": 7.72
+      },
+      "query_latency_ms": {
+        "mean": 401.32,
+        "p50": 409.87,
+        "p95": 443.7,
+        "p99": 471.84,
+        "min": 203.08,
+        "max": 478.72,
+        "total_queries_executed": 36
+      },
+      "retrieval_accuracy": {
+        "recall@1": 0.7407,
+        "recall@5": 0.8333,
+        "recall@10": 0.8889,
+        "mrr": 0.8403
+      },
+      "memory_mb": {
+        "initial_rss": 900.09,
+        "post_index_rss": 951.95,
+        "peak_rss": 951.95,
+        "delta_rss": 51.86
+      }
+    },
+    "deltas": {
+      "indexing_speedup_x": 1.18,
+      "query_latency_delta_ms": 343.55,
+      "recall_at_10_delta": 0.0
+    }
+  },
+  "gaps_resolved": [
+    "LanceStore GCS URI handling (bypassing Path.mkdir for gs:// and gcs://)",
+    "Store factory parse_store_uri support for gs and gcs schemes",
+    "EMBEDDING_DIMENSIONS registry populated with text-embedding-004 (768 dimensions)",
+    "Native EmbeddingGenerator backend='vertexai' with Google Application Default Credentials",
+    "Dynamic OAuth2 Bearer token refreshing in LLMClient for Vertex AI endpoints",
+    "Serverless container image size reduction from 4.5GB (PyTorch) to <300MB (Vertex AI client)"
+  ],
+  "status": "COMPLETED"
+}

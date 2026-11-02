@@ -1,0 +1,634 @@
+{
+  "timestamp": "2026-11-01T02:55:09Z",
+  "dataset_selection": "all",
+  "condition_selection": "both",
+  "k": 10,
+  "datasets": {
+    "cranfield": {
+      "dataset": "cranfield",
+      "baseline": {
+        "condition": "baseline",
+        "dataset": "cranfield",
+        "metrics": {
+          "ndcg@10": 0.7795,
+          "recall@5": 0.7,
+          "recall@10": 0.8,
+          "mrr@10": 0.8667,
+          "precision@10": 0.16
+        },
+        "performance": {
+          "mean_latency_ms": 162.2,
+          "p50_latency_ms": 143.72,
+          "p95_latency_ms": 353.84,
+          "throughput_qps": 6.12,
+          "total_queries": 5,
+          "total_duration_sec": 0.817
+        },
+        "per_query_results": [
+          {
+            "query_id": "cran_q01",
+            "query": "What acoustic disturbance mechanisms govern boundary layer stability in supersonic flat plate flow?",
+            "retrieved_ids": [
+              "cranfield_dist_0001",
+              "cranfield_dist_0001",
+              "cranfield_0001",
+              "cranfield_0003",
+              "cranfield_dist_0010",
+              "cranfield_0003",
+              "cranfield_dist_0002",
+              "cranfield_dist_0007",
+              "cranfield_dist_0007",
+              "cranfield_0006"
+            ],
+            "ground_truth": [
+              "cranfield_0001",
+              "cranfield_0007"
+            ],
+            "latency_ms": 403.59,
+            "ndcg@10": 0.4587,
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr@10": 0.3333,
+            "precision@10": 0.1
+          },
+          {
+            "query_id": "cran_q02",
+            "query": "What analytical methods calculate convective and radiative heating during atmospheric entry?",
+            "retrieved_ids": [
+              "cranfield_0012",
+              "cranfield_0012",
+              "cranfield_0002",
+              "cranfield_dist_0005",
+              "cranfield_0002",
+              "cranfield_dist_0005",
+              "cranfield_0006",
+              "cranfield_0006",
+              "cranfield_dist_0004",
+              "cranfield_0007"
+            ],
+            "ground_truth": [
+              "cranfield_0002",
+              "cranfield_0012"
+            ],
+            "latency_ms": 154.86,
+            "ndcg@10": 0.7309,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "cran_q03",
+            "query": "What aerodynamic mechanisms induce the transonic dip in wing flutter boundaries?",
+            "retrieved_ids": [
+              "cranfield_0005",
+              "cranfield_dist_0010",
+              "cranfield_0005",
+              "cranfield_0010",
+              "cranfield_0009",
+              "cranfield_dist_0010",
+              "cranfield_0010",
+              "cranfield_dist_0004",
+              "cranfield_dist_0008",
+              "cranfield_dist_0008"
+            ],
+            "ground_truth": [
+              "cranfield_0005",
+              "cranfield_0006"
+            ],
+            "latency_ms": 143.72,
+            "ndcg@10": 0.9173,
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr@10": 1.0,
+            "precision@10": 0.1
+          },
+          {
+            "query_id": "cran_q04",
+            "query": "How does boundary layer manipulation with suction surfaces achieve laminar flow control?",
+            "retrieved_ids": [
+              "cranfield_0011",
+              "cranfield_0004",
+              "cranfield_dist_0001",
+              "cranfield_0004",
+              "cranfield_0007",
+              "cranfield_0007",
+              "cranfield_0001",
+              "cranfield_dist_0007",
+              "cranfield_dist_0011",
+              "cranfield_dist_0012"
+            ],
+            "ground_truth": [
+              "cranfield_0004",
+              "cranfield_0011"
+            ],
+            "latency_ms": 64.62,
+            "ndcg@10": 0.834,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "cran_q05",
+            "query": "How do adverse pressure gradients and shock reflections generate separation bubbles in compressor stages?",
+            "retrieved_ids": [
+              "cranfield_0003",
+              "cranfield_dist_0007",
+              "cranfield_dist_0007",
+              "cranfield_dist_0012",
+              "cranfield_dist_0010",
+              "cranfield_dist_0001",
+              "cranfield_0003",
+              "cranfield_dist_0001",
+              "cranfield_0007",
+              "cranfield_dist_0002"
+            ],
+            "ground_truth": [
+              "cranfield_0003",
+              "cranfield_0007"
+            ],
+            "latency_ms": 44.23,
+            "ndcg@10": 0.9568,
+            "recall@5": 0.5,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          }
+        ]
+      },
+      "enhanced": {
+        "condition": "enhanced",
+        "dataset": "cranfield",
+        "metrics": {
+          "ndcg@10": 0.9766,
+          "recall@5": 0.9,
+          "recall@10": 0.9,
+          "mrr@10": 1.0,
+          "precision@10": 0.18
+        },
+        "performance": {
+          "mean_latency_ms": 122.59,
+          "p50_latency_ms": 120.1,
+          "p95_latency_ms": 162.92,
+          "throughput_qps": 8.15,
+          "total_queries": 5,
+          "total_duration_sec": 0.614
+        },
+        "per_query_results": [
+          {
+            "query_id": "cran_q01",
+            "query": "What acoustic disturbance mechanisms govern boundary layer stability in supersonic flat plate flow?",
+            "retrieved_ids": [
+              "cranfield_0001",
+              "cranfield_dist_0001",
+              "cranfield_dist_0004",
+              "cranfield_dist_0007",
+              "cranfield_0003",
+              "cranfield_0002",
+              "cranfield_dist_0010",
+              "cranfield_dist_0009",
+              "cranfield_dist_0002"
+            ],
+            "ground_truth": [
+              "cranfield_0001",
+              "cranfield_0007"
+            ],
+            "latency_ms": 120.1,
+            "ndcg@10": 0.9173,
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr@10": 1.0,
+            "precision@10": 0.1
+          },
+          {
+            "query_id": "cran_q02",
+            "query": "What analytical methods calculate convective and radiative heating during atmospheric entry?",
+            "retrieved_ids": [
+              "cranfield_0002",
+              "cranfield_0012",
+              "cranfield_0008",
+              "cranfield_0006",
+              "cranfield_dist_0005",
+              "cranfield_0007",
+              "cranfield_dist_0003",
+              "cranfield_0001",
+              "cranfield_dist_0004"
+            ],
+            "ground_truth": [
+              "cranfield_0002",
+              "cranfield_0012"
+            ],
+            "latency_ms": 169.77,
+            "ndcg@10": 1.0,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "cran_q03",
+            "query": "What aerodynamic mechanisms induce the transonic dip in wing flutter boundaries?",
+            "retrieved_ids": [
+              "cranfield_0005",
+              "cranfield_dist_0010",
+              "cranfield_0006",
+              "cranfield_0003",
+              "cranfield_dist_0008",
+              "cranfield_0009",
+              "cranfield_0010",
+              "cranfield_dist_0009",
+              "cranfield_0002"
+            ],
+            "ground_truth": [
+              "cranfield_0005",
+              "cranfield_0006"
+            ],
+            "latency_ms": 103.84,
+            "ndcg@10": 0.9828,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "cran_q04",
+            "query": "How does boundary layer manipulation with suction surfaces achieve laminar flow control?",
+            "retrieved_ids": [
+              "cranfield_0004",
+              "cranfield_0011",
+              "cranfield_dist_0011",
+              "cranfield_0001",
+              "cranfield_dist_0001",
+              "cranfield_0007",
+              "cranfield_0003",
+              "cranfield_dist_0004",
+              "cranfield_dist_0002"
+            ],
+            "ground_truth": [
+              "cranfield_0004",
+              "cranfield_0011"
+            ],
+            "latency_ms": 135.52,
+            "ndcg@10": 1.0,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "cran_q05",
+            "query": "How do adverse pressure gradients and shock reflections generate separation bubbles in compressor stages?",
+            "retrieved_ids": [
+              "cranfield_0003",
+              "cranfield_dist_0007",
+              "cranfield_0007",
+              "cranfield_dist_0010",
+              "cranfield_dist_0005",
+              "cranfield_dist_0001",
+              "cranfield_dist_0011",
+              "cranfield_0011",
+              "cranfield_dist_0002"
+            ],
+            "ground_truth": [
+              "cranfield_0003",
+              "cranfield_0007"
+            ],
+            "latency_ms": 83.71,
+            "ndcg@10": 0.9828,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          }
+        ]
+      },
+      "comparisons": {
+        "gain_ndcg_pct": 25.28,
+        "gain_recall_10_pct": 12.5,
+        "gain_mrr_pct": 15.38,
+        "verified": true
+      }
+    },
+    "beir": {
+      "dataset": "beir",
+      "baseline": {
+        "condition": "baseline",
+        "dataset": "beir",
+        "metrics": {
+          "ndcg@10": 0.8767,
+          "recall@5": 0.7,
+          "recall@10": 1.0,
+          "mrr@10": 0.8667,
+          "precision@10": 0.2
+        },
+        "performance": {
+          "mean_latency_ms": 168.55,
+          "p50_latency_ms": 136.39,
+          "p95_latency_ms": 300.66,
+          "throughput_qps": 5.92,
+          "total_queries": 5,
+          "total_duration_sec": 0.845
+        },
+        "per_query_results": [
+          {
+            "query_id": "beir_q01",
+            "query": "What adjuvant therapy improves survival in patients with resected malignant astrocytomas?",
+            "retrieved_ids": [
+              "beir_dist_0001",
+              "beir_dist_0001",
+              "beir_scifact_0001",
+              "beir_scifact_0001",
+              "beir_dist_0012",
+              "beir_scifact_0003",
+              "beir_scifact_0011",
+              "beir_scifact_0012",
+              "beir_scifact_0009",
+              "beir_scifact_0010"
+            ],
+            "ground_truth": [
+              "beir_scifact_0001",
+              "beir_scifact_0003"
+            ],
+            "latency_ms": 226.79,
+            "ndcg@10": 0.5137,
+            "recall@5": 0.5,
+            "recall@10": 1.0,
+            "mrr@10": 0.3333,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q02",
+            "query": "What targeted molecular therapies enhance hepatic clearance of circulating LDL cholesterol by preventing receptor degradation?",
+            "retrieved_ids": [
+              "beir_scifact_0002",
+              "beir_scifact_0002",
+              "beir_dist_0006",
+              "beir_scifact_0007",
+              "beir_scifact_0007",
+              "beir_dist_0006",
+              "beir_dist_0010",
+              "beir_scifact_0005",
+              "beir_scifact_0005",
+              "beir_dist_0010"
+            ],
+            "ground_truth": [
+              "beir_scifact_0002",
+              "beir_scifact_0007"
+            ],
+            "latency_ms": 319.13,
+            "ndcg@10": 0.9738,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q03",
+            "query": "Does targeted IL-6 receptor inhibition with tocilizumab reduce systemic inflammation in severe respiratory distress?",
+            "retrieved_ids": [
+              "beir_scifact_0004",
+              "beir_scifact_0004",
+              "beir_dist_0007",
+              "beir_dist_0007",
+              "beir_scifact_0008",
+              "beir_scifact_0008",
+              "beir_scifact_0012",
+              "beir_scifact_0011",
+              "beir_dist_0008",
+              "beir_scifact_0011"
+            ],
+            "ground_truth": [
+              "beir_scifact_0004",
+              "beir_scifact_0008"
+            ],
+            "latency_ms": 136.39,
+            "ndcg@10": 0.968,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q04",
+            "query": "Does metformin suppression of hepatic gluconeogenesis via AMPK phosphorylation regulate fasting glucose?",
+            "retrieved_ids": [
+              "beir_scifact_0005",
+              "beir_scifact_0005",
+              "beir_dist_0010",
+              "beir_dist_0010",
+              "beir_scifact_0002",
+              "beir_scifact_0007",
+              "beir_scifact_0002",
+              "beir_dist_0004",
+              "beir_scifact_0007",
+              "beir_scifact_0012"
+            ],
+            "ground_truth": [
+              "beir_scifact_0005",
+              "beir_scifact_0007"
+            ],
+            "latency_ms": 98.99,
+            "ndcg@10": 0.964,
+            "recall@5": 0.5,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q05",
+            "query": "Do TERT promoter mutations generate de novo ETS transcription factor binding motifs that confer cellular immortality?",
+            "retrieved_ids": [
+              "beir_scifact_0006",
+              "beir_scifact_0006",
+              "beir_dist_0012",
+              "beir_dist_0012",
+              "beir_dist_0002",
+              "beir_scifact_0009",
+              "beir_scifact_0009",
+              "beir_scifact_0001",
+              "beir_scifact_0010",
+              "beir_dist_0005"
+            ],
+            "ground_truth": [
+              "beir_scifact_0006",
+              "beir_scifact_0009"
+            ],
+            "latency_ms": 61.46,
+            "ndcg@10": 0.964,
+            "recall@5": 0.5,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          }
+        ]
+      },
+      "enhanced": {
+        "condition": "enhanced",
+        "dataset": "beir",
+        "metrics": {
+          "ndcg@10": 0.9807,
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "precision@10": 0.2
+        },
+        "performance": {
+          "mean_latency_ms": 175.32,
+          "p50_latency_ms": 196.78,
+          "p95_latency_ms": 278.81,
+          "throughput_qps": 5.7,
+          "total_queries": 5,
+          "total_duration_sec": 0.877
+        },
+        "per_query_results": [
+          {
+            "query_id": "beir_q01",
+            "query": "What adjuvant therapy improves survival in patients with resected malignant astrocytomas?",
+            "retrieved_ids": [
+              "beir_scifact_0001",
+              "beir_dist_0001",
+              "beir_scifact_0003",
+              "beir_scifact_0011",
+              "beir_dist_0012",
+              "beir_dist_0008",
+              "beir_scifact_0012",
+              "beir_scifact_0009"
+            ],
+            "ground_truth": [
+              "beir_scifact_0001",
+              "beir_scifact_0003"
+            ],
+            "latency_ms": 295.03,
+            "ndcg@10": 0.9558,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q02",
+            "query": "What targeted molecular therapies enhance hepatic clearance of circulating LDL cholesterol by preventing receptor degradation?",
+            "retrieved_ids": [
+              "beir_scifact_0002",
+              "beir_scifact_0007",
+              "beir_dist_0006",
+              "beir_dist_0010",
+              "beir_scifact_0005",
+              "beir_scifact_0004",
+              "beir_dist_0001",
+              "beir_dist_0011"
+            ],
+            "ground_truth": [
+              "beir_scifact_0002",
+              "beir_scifact_0007"
+            ],
+            "latency_ms": 213.94,
+            "ndcg@10": 1.0,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q03",
+            "query": "Does targeted IL-6 receptor inhibition with tocilizumab reduce systemic inflammation in severe respiratory distress?",
+            "retrieved_ids": [
+              "beir_scifact_0004",
+              "beir_dist_0007",
+              "beir_scifact_0002",
+              "beir_scifact_0008",
+              "beir_scifact_0011",
+              "beir_dist_0008",
+              "beir_dist_0004",
+              "beir_dist_0001"
+            ],
+            "ground_truth": [
+              "beir_scifact_0004",
+              "beir_scifact_0008"
+            ],
+            "latency_ms": 196.78,
+            "ndcg@10": 0.9738,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q04",
+            "query": "Does metformin suppression of hepatic gluconeogenesis via AMPK phosphorylation regulate fasting glucose?",
+            "retrieved_ids": [
+              "beir_scifact_0005",
+              "beir_dist_0010",
+              "beir_dist_0011",
+              "beir_scifact_0007",
+              "beir_dist_0006",
+              "beir_scifact_0002",
+              "beir_dist_0007",
+              "beir_dist_0003"
+            ],
+            "ground_truth": [
+              "beir_scifact_0005",
+              "beir_scifact_0007"
+            ],
+            "latency_ms": 92.95,
+            "ndcg@10": 0.9738,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          },
+          {
+            "query_id": "beir_q05",
+            "query": "Do TERT promoter mutations generate de novo ETS transcription factor binding motifs that confer cellular immortality?",
+            "retrieved_ids": [
+              "beir_scifact_0006",
+              "beir_scifact_0009",
+              "beir_dist_0012",
+              "beir_scifact_0001",
+              "beir_dist_0002",
+              "beir_scifact_0010",
+              "beir_scifact_0008",
+              "beir_dist_0007",
+              "beir_scifact_0003"
+            ],
+            "ground_truth": [
+              "beir_scifact_0006",
+              "beir_scifact_0009"
+            ],
+            "latency_ms": 77.9,
+            "ndcg@10": 1.0,
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr@10": 1.0,
+            "precision@10": 0.2
+          }
+        ]
+      },
+      "comparisons": {
+        "gain_ndcg_pct": 11.86,
+        "gain_recall_10_pct": 0.0,
+        "gain_mrr_pct": 15.38,
+        "verified": true
+      }
+    }
+  },
+  "overall_summary": {
+    "baseline": {
+      "ndcg@10": 0.8281,
+      "recall@5": 0.7,
+      "recall@10": 0.9,
+      "mrr@10": 0.8667
+    },
+    "enhanced": {
+      "ndcg@10": 0.9787,
+      "recall@5": 0.95,
+      "recall@10": 0.95,
+      "mrr@10": 1.0
+    },
+    "gain_ndcg_pct": 18.18,
+    "gain_recall_10_pct": 5.56,
+    "gain_mrr_pct": 15.38,
+    "verified": true
+  }
+}

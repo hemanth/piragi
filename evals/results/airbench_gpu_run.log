@@ -1,0 +1,184 @@
+
+=== Official AIR-Bench_24.05 Long-Doc Dev Evaluation ===
+
+[Step 1/4] Loading corpora & running Piragi PDF/EPUB de-gluing + BM25 indexing (4 subtasks)...
+
+[Step 2/4] Encoding dense bi-encoders sequentially on cuda (torch.bfloat16)...
+  -> Bi-Encoder [1/4]: Alibaba-NLP/gte-Qwen2-1.5B-instruct
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.74s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.26it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.07it/s]
+past_key_values should not be None in from_legacy_cache()
+     completed in 83.8s
+  -> Bi-Encoder [2/4]: BAAI/bge-large-en-v1.5
+     completed in 32.9s
+  -> Bi-Encoder [3/4]: mixedbread-ai/mxbai-embed-large-v1
+     completed in 29.0s
+  -> Bi-Encoder [4/4]: intfloat/e5-large-v2
+     completed in 29.7s
+
+[Step 3/4] Computing Multi-Space Hybrid RRF + Consensus Rocchio PRF...
+
+[Step 4/4] Running Length-Sorted GPU Reranking (top-150, max_len=512)...
+  -> Reranker [1/3]: BAAI/bge-reranker-v2-gemma
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:01<00:02,  1.11s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:01<00:00,  1.29it/s]Loading checkpoint shards: 100%|██████████| 3/3 [00:01<00:00,  1.80it/s]
+You're using a GemmaTokenizerFast tokenizer. Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
+     [healthcare/pubmed_100K-200K_3] 53550 pairs scored by BAAI/bge-reranker-v2-gemma in 1353.2s
+     [arxiv/llama2] 48900 pairs scored by BAAI/bge-reranker-v2-gemma in 1280.7s
+     [law/lex_files_300K-400K] 50850 pairs scored by BAAI/bge-reranker-v2-gemma in 1388.0s
+     [book/a-brief-history-of-time_stephen-hawking] 55500 pairs scored by BAAI/bge-reranker-v2-gemma in 1291.5s
+     completed BAAI/bge-reranker-v2-gemma in 5319.1s
+  -> Reranker [2/3]: BAAI/bge-reranker-v2-m3
+     [healthcare/pubmed_100K-200K_3] 53550 pairs scored in 272.2s
+     [arxiv/llama2] 48900 pairs scored in 224.8s
+     [law/lex_files_300K-400K] 50850 pairs scored in 227.0s
+     [book/a-brief-history-of-time_stephen-hawking] 55500 pairs scored in 232.5s
+     completed BAAI/bge-reranker-v2-m3 in 969.7s
+  -> Reranker [3/3]: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+     [healthcare/pubmed_100K-200K_3] 53550 pairs scored in 40.2s
+     [arxiv/llama2] 48900 pairs scored in 43.8s
+     [law/lex_files_300K-400K] 50850 pairs scored in 51.8s
+     [book/a-brief-history-of-time_stephen-hawking] 55500 pairs scored in 50.6s
+     completed cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 in 193.4s
+
+Completed batch (4 subtasks) in 6722.2s
+[healthcare/pubmed_100K-200K_3] Stage1(NoPRF->PRF) R@10=74.07%->74.16% R@100=95.49%->94.97% | Ensemble R@10=86.52% nDCG@10=77.72% MRR@10=83.72%
+[arxiv/llama2] Stage1(NoPRF->PRF) R@10=76.84%->78.47% R@100=95.86%->96.01% | Ensemble R@10=86.43% nDCG@10=71.44% MRR@10=71.80%
+[law/lex_files_300K-400K] Stage1(NoPRF->PRF) R@10=77.87%->78.74% R@100=98.75%->98.75% | Ensemble R@10=89.64% nDCG@10=83.06% MRR@10=88.72%
+[book/a-brief-history-of-time_stephen-hawking] Stage1(NoPRF->PRF) R@10=82.52%->82.06% R@100=99.30%->99.39% | Ensemble R@10=92.25% nDCG@10=78.61% MRR@10=78.94%
+
+--- Dev Macro-Average Summary (4 Official Domains) ---
+Stage-1 Hybrid RRF (No PRF): Recall@10 = 77.83% | Recall@100 = 97.35%
+Stage-1 Hybrid RRF (+ PRF) : Recall@10 = 78.36% | nDCG@10 = 66.19% | Recall@100 = 97.28%
+Piragi + Ensemble Reranker : Recall@10 = 88.71% | nDCG@10 = 77.71% | MRR@10 = 80.79%
+
+--- Individual Reranker [BAAI/bge-reranker-v2-gemma] Sweep (Dev Macro-Average) ---
+  fusion_weight=0.00 -> Recall@10=83.98% | nDCG@10=73.88% | MRR@10=79.04%
+  fusion_weight=0.08 -> Recall@10=85.76% | nDCG@10=75.40% | MRR@10=80.24%
+  fusion_weight=0.12 -> Recall@10=85.87% | nDCG@10=75.79% | MRR@10=80.67%
+  fusion_weight=0.15 -> Recall@10=85.60% | nDCG@10=75.77% | MRR@10=80.66%
+  fusion_weight=0.20 -> Recall@10=85.65% | nDCG@10=75.77% | MRR@10=80.63%
+
+--- Individual Reranker [BAAI/bge-reranker-v2-m3] Sweep (Dev Macro-Average) ---
+  fusion_weight=0.00 -> Recall@10=82.73% | nDCG@10=72.54% | MRR@10=77.27%
+  fusion_weight=0.08 -> Recall@10=84.25% | nDCG@10=73.58% | MRR@10=77.82%
+  fusion_weight=0.12 -> Recall@10=85.03% | nDCG@10=73.97% | MRR@10=78.04%
+  fusion_weight=0.15 -> Recall@10=85.23% | nDCG@10=74.16% | MRR@10=78.22%
+  fusion_weight=0.20 -> Recall@10=85.53% | nDCG@10=74.40% | MRR@10=78.41%
+
+--- Individual Reranker [cross-encoder/mmarco-mMiniLMv2-L12-H384-v1] Sweep (Dev Macro-Average) ---
+  fusion_weight=0.00 -> Recall@10=83.64% | nDCG@10=70.85% | MRR@10=73.62%
+  fusion_weight=0.08 -> Recall@10=85.08% | nDCG@10=72.13% | MRR@10=74.45%
+  fusion_weight=0.12 -> Recall@10=85.50% | nDCG@10=72.57% | MRR@10=74.97%
+  fusion_weight=0.15 -> Recall@10=86.17% | nDCG@10=72.88% | MRR@10=75.14%
+  fusion_weight=0.20 -> Recall@10=86.35% | nDCG@10=73.26% | MRR@10=75.58%
+
+--- Reranker Blend [full_blend] Sweep (Dev Macro-Average) ---
+  [full_blend] fusion_weight=0.00 -> Recall@10=88.11% | nDCG@10=77.00% | MRR@10=80.20%
+  [full_blend] fusion_weight=0.08 -> Recall@10=88.70% | nDCG@10=77.56% | MRR@10=80.63%
+  [full_blend] fusion_weight=0.12 -> Recall@10=88.71% | nDCG@10=77.71% | MRR@10=80.79%
+  [full_blend] fusion_weight=0.15 -> Recall@10=88.64% | nDCG@10=77.81% | MRR@10=81.03%
+  [full_blend] fusion_weight=0.20 -> Recall@10=88.64% | nDCG@10=77.67% | MRR@10=80.99%
+
+--- Reranker Blend [gemma_heavy] Sweep (Dev Macro-Average) ---
+  [gemma_heavy] fusion_weight=0.00 -> Recall@10=87.15% | nDCG@10=76.58% | MRR@10=80.31%
+  [gemma_heavy] fusion_weight=0.08 -> Recall@10=87.95% | nDCG@10=77.41% | MRR@10=81.09%
+  [gemma_heavy] fusion_weight=0.12 -> Recall@10=88.23% | nDCG@10=77.50% | MRR@10=81.04%
+  [gemma_heavy] fusion_weight=0.15 -> Recall@10=88.17% | nDCG@10=77.50% | MRR@10=81.09%
+  [gemma_heavy] fusion_weight=0.20 -> Recall@10=88.12% | nDCG@10=77.41% | MRR@10=81.00%
+
+--- Reranker Blend [gemma_m3_only] Sweep (Dev Macro-Average) ---
+  [gemma_m3_only] fusion_weight=0.00 -> Recall@10=85.77% | nDCG@10=75.39% | MRR@10=79.75%
+  [gemma_m3_only] fusion_weight=0.08 -> Recall@10=86.89% | nDCG@10=76.31% | MRR@10=80.30%
+  [gemma_m3_only] fusion_weight=0.12 -> Recall@10=87.09% | nDCG@10=76.55% | MRR@10=80.46%
+  [gemma_m3_only] fusion_weight=0.15 -> Recall@10=87.22% | nDCG@10=76.68% | MRR@10=80.61%
+  [gemma_m3_only] fusion_weight=0.20 -> Recall@10=87.57% | nDCG@10=76.75% | MRR@10=80.59%
+
+Selected Best Dev Config: full_blend (fusion_weight=0.15, weights=[1.35, 1.0, 0.45]) -> R@10=88.64% | nDCG@10=77.81% | MRR@10=81.03%
+
+=== Generating Official AIR-Bench_24.05 Long-Doc Test Predictions (11 Subtasks) ===
+
+[Step 1/4] Loading corpora & running Piragi PDF/EPUB de-gluing + BM25 indexing (11 subtasks)...
+
+[Step 2/4] Encoding dense bi-encoders sequentially on cuda (torch.bfloat16)...
+  -> Bi-Encoder [1/4]: Alibaba-NLP/gte-Qwen2-1.5B-instruct
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.83it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  3.21it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.89it/s]
+     completed in 349.6s
+  -> Bi-Encoder [2/4]: BAAI/bge-large-en-v1.5
+     completed in 91.3s
+  -> Bi-Encoder [3/4]: mixedbread-ai/mxbai-embed-large-v1
+     completed in 90.1s
+  -> Bi-Encoder [4/4]: intfloat/e5-large-v2
+     completed in 90.6s
+
+[Step 3/4] Computing Multi-Space Hybrid RRF + Consensus Rocchio PRF...
+
+[Step 4/4] Running Length-Sorted GPU Reranking (top-150, max_len=512)...
+  -> Reranker [1/3]: BAAI/bge-reranker-v2-gemma
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:03<00:06,  3.28s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:03<00:01,  1.64s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:03<00:00,  1.26s/it]
+You're using a GemmaTokenizerFast tokenizer. Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
+     [healthcare/pubmed_100K-200K_1] 55800 pairs scored by BAAI/bge-reranker-v2-gemma in 1410.2s
+     [healthcare/pubmed_100K-200K_2] 53250 pairs scored by BAAI/bge-reranker-v2-gemma in 1341.7s
+     [healthcare/pubmed_40K-50K_5-merged] 50400 pairs scored by BAAI/bge-reranker-v2-gemma in 1360.3s
+     [healthcare/pubmed_30K-40K_10-merged] 55200 pairs scored by BAAI/bge-reranker-v2-gemma in 1345.4s
+     [arxiv/gpt3] 50550 pairs scored by BAAI/bge-reranker-v2-gemma in 1265.8s
+     [arxiv/gemini] 37350 pairs scored by BAAI/bge-reranker-v2-gemma in 1052.9s
+     [arxiv/llm-survey] 53550 pairs scored by BAAI/bge-reranker-v2-gemma in 1344.1s
+     [law/lex_files_400K-500K] 49950 pairs scored by BAAI/bge-reranker-v2-gemma in 1475.7s
+     [law/lex_files_500K-600K] 51900 pairs scored by BAAI/bge-reranker-v2-gemma in 1516.1s
+     [law/lex_files_600K-700K] 50700 pairs scored by BAAI/bge-reranker-v2-gemma in 1454.3s
+     [book/origin-of-species_darwin] 54900 pairs scored by BAAI/bge-reranker-v2-gemma in 1264.7s
+     completed BAAI/bge-reranker-v2-gemma in 14838.8s
+  -> Reranker [2/3]: BAAI/bge-reranker-v2-m3
+     [healthcare/pubmed_100K-200K_1] 55800 pairs scored in 268.1s
+     [healthcare/pubmed_100K-200K_2] 53250 pairs scored in 255.8s
+     [healthcare/pubmed_40K-50K_5-merged] 50400 pairs scored in 227.4s
+     [healthcare/pubmed_30K-40K_10-merged] 55200 pairs scored in 250.9s
+     [arxiv/gpt3] 50550 pairs scored in 217.6s
+     [arxiv/gemini] 37350 pairs scored in 203.0s
+     [arxiv/llm-survey] 53550 pairs scored in 222.7s
+     [law/lex_files_400K-500K] 49950 pairs scored in 216.5s
+     [law/lex_files_500K-600K] 51900 pairs scored in 223.9s
+     [law/lex_files_600K-700K] 50700 pairs scored in 255.0s
+     [book/origin-of-species_darwin] 54900 pairs scored in 222.7s
+     completed BAAI/bge-reranker-v2-m3 in 2565.9s
+  -> Reranker [3/3]: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+     [healthcare/pubmed_100K-200K_1] 55800 pairs scored in 40.6s
+     [healthcare/pubmed_100K-200K_2] 53250 pairs scored in 48.1s
+     [healthcare/pubmed_40K-50K_5-merged] 50400 pairs scored in 41.0s
+     [healthcare/pubmed_30K-40K_10-merged] 55200 pairs scored in 49.6s
+     [arxiv/gpt3] 50550 pairs scored in 44.0s
+     [arxiv/gemini] 37350 pairs scored in 36.8s
+     [arxiv/llm-survey] 53550 pairs scored in 47.8s
+     [law/lex_files_400K-500K] 49950 pairs scored in 46.7s
+     [law/lex_files_500K-600K] 51900 pairs scored in 49.9s
+     [law/lex_files_600K-700K] 50700 pairs scored in 51.5s
+     [book/origin-of-species_darwin] 54900 pairs scored in 49.5s
+     completed cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 in 507.8s
+
+Completed batch (11 subtasks) in 18599.1s
+Verified zip: evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_bge-reranker-v2-gemma.zip (16.34 MB, md5=ace344c38224db29b7fbb11cbe0d9a76)
+Verified zip: evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_noreranker_sota.zip (15.73 MB, md5=e13f671afedb2975e88f09f4cd3777e6)
+Verified zip: evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_bge-reranker-v2-gemma.zip (16.40 MB, md5=b49cf3decc358dc68cc783a1e90242e7)
+Verified zip: evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_bge-reranker-v2-m3.zip (16.16 MB, md5=0db52ee90dba6526f0bb60ce37e48de2)
+Verified zip: evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_mmarco-mMiniLMv2-L12-H384-v1.zip (16.30 MB, md5=3b6786b957501f98fe6ffe651efa89b6)
+Uploading archive to: https://air-bench-leaderboard.hf.space/upload
+Uploaded remote path: /tmp/gradio/c0e5bae9eee1f0ce560e06628ef677dab71a2425/piragi_airbench_2405_longdoc_bge-reranker-v2-gemma.zip
+LIVE SUBMISSION RESULT (Primary): <p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!
+Retrieval method: piragi
+Reranking model: bge-reranker-v2-gemma
+Submission revision: ace344c38224db29b7fbb11cbe0d9a76</p>
+Uploading archive to: https://air-bench-leaderboard.hf.space/upload
+Uploaded remote path: /tmp/gradio/38a4fa8a311b70584ecfd94927ac46ccd434fa7b/piragi_airbench_2405_longdoc_single_bge-reranker-v2-m3.zip
+LIVE SUBMISSION RESULT (bge-reranker-v2-m3): <p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!
+Retrieval method: piragi
+Reranking model: bge-reranker-v2-m3
+Submission revision: 0db52ee90dba6526f0bb60ce37e48de2</p>
+Uploading archive to: https://air-bench-leaderboard.hf.space/upload
+Uploaded remote path: /tmp/gradio/08ed3111488514155a9726cd58fdd9c94e092e61/piragi_airbench_2405_longdoc_noreranker_sota.zip
+LIVE SUBMISSION RESULT (NoReranker): <p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!
+Retrieval method: piragi
+Reranking model: NoReranker
+Submission revision: e13f671afedb2975e88f09f4cd3777e6</p>
+
+Saved summary report to: evals/results/airbench_2405_live_summary.json

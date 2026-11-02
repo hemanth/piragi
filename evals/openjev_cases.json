@@ -1,0 +1,163 @@
+{
+  "description": "Authored development fixture for evidence filtering, including adjacent passages and unanswerable questions. Labels predate running the revised judge; not an independent benchmark.",
+  "documents": {
+    "local-models.md": "Piragi defaults to the local Ollama answer model llama3.2 at http://localhost:11434/v1. Run ollama pull llama3.2 before asking questions. Set llm.model and llm.base_url to select another model. A local answer model, local embeddings, and local storage keep query processing on the device after model downloads.",
+    "query-expansion.md": "Query expansion generates two alternative phrasings, then searches the original query and both alternatives. Disable it with llm.enable_query_expansion=False to avoid this generation call. Expansion can improve recall for conceptual questions but costs latency. The OpenJev evidence preset disables expansion by default; an explicit expansion setting takes precedence.",
+    "hybrid-search.md": "Set retrieval.use_hybrid_search=True to combine vector similarity with BM25 keyword search. Exact error codes, identifiers, and rare terms often benefit from keyword matching. Vector search helps with paraphrases and semantic similarity. Reciprocal rank fusion combines the rankings. vector_weight and bm25_weight control weighted fusion when use_rrf=False.",
+    "reranking.md": "Enable retrieval.use_cross_encoder=True to rerank retrieved candidate passages against the original question. Piragi retrieves top_k multiplied by four candidates before cross-encoder reranking, then keeps top_k results. This extra model execution can improve precision but adds compute and latency. Cross-encoder reranking and query expansion address different parts of retrieval.",
+    "hyde.md": "Enable retrieval.use_hyde=True to generate a hypothetical document from the question and embed that document for retrieval. HyDE can bridge the vocabulary gap between a short question and longer documents. It incurs an extra LLM generation. When enabled with evidence judging, HyDE runs before retrieval and the resulting passages are judged against the original question.",
+    "filters.md": "Use kb.filter(team='docs').ask(query) to restrict search to documents with matching metadata. filter returns a separate FilteredRagi view. Metadata filters apply to the vector-store search. Reusing the parent kb does not inherit the filtered view's metadata constraints.",
+    "async.md": "Use AsyncRagi in async applications and await kb.ask(query), kb.retrieve(query), or kb.add(path). It runs synchronous work in a thread executor so the event loop is not blocked. A shared SemIfDecisionEngine serializes its model loading and scoring when multiple requests use the same engine.",
+    "chunking.md": "The default chunking strategy is fixed. Semantic chunking splits at topic boundaries. Hierarchical chunking stores smaller child chunks for matching and expands retrieved child chunks to parent text for context. Select strategies through chunk.strategy; hierarchical uses parent_size and child_size settings.",
+    "updates.md": "Automatic updates are enabled by default. Piragi checks tracked sources for changes every 300 seconds and refreshes them in the background. Configure auto_update.interval to change the polling interval or auto_update.enabled=False to disable background updates. Explicit kb.refresh(path) updates a source on demand.",
+    "citations.md": "kb.ask returns an Answer with text, query, and citations. Every Citation contains source, chunk, score, and metadata. kb.retrieve(query, top_k=5) returns citations without generating an answer or performing ordinary query expansion. top_k controls how many retrieved chunks are retained; citation scores are relevance scores, not probabilities of answer correctness.",
+    "adjacent-models.md": "Model names are configurable in Piragi. This page discusses model configuration in general but does not list model limits, accuracy guarantees, or performance measurements. Choosing a local answer model does not establish a bound on latency. This passage provides no measured latency for any model.",
+    "adjacent-filters.md": "Metadata filters limit the documents searched. A filter is not an authorization system and this guide does not specify an enterprise access-control integration. A document about filtering does not establish which authentication or single sign-on provider a deployed application uses."
+  },
+  "queries": [
+    {
+      "id": "s01",
+      "kind": "specific",
+      "query": "What is the default Ollama answer model?",
+      "relevant_sources": [
+        "local-models.md"
+      ]
+    },
+    {
+      "id": "s02",
+      "kind": "specific",
+      "query": "How do I set llm.enable_query_expansion to disable expansion?",
+      "relevant_sources": [
+        "query-expansion.md"
+      ]
+    },
+    {
+      "id": "s03",
+      "kind": "specific",
+      "query": "What does retrieval.use_hybrid_search enable?",
+      "relevant_sources": [
+        "hybrid-search.md"
+      ]
+    },
+    {
+      "id": "s04",
+      "kind": "specific",
+      "query": "How many candidates does cross-encoder reranking fetch relative to top_k?",
+      "relevant_sources": [
+        "reranking.md"
+      ]
+    },
+    {
+      "id": "s05",
+      "kind": "specific",
+      "query": "What does retrieval.use_hyde do?",
+      "relevant_sources": [
+        "hyde.md"
+      ]
+    },
+    {
+      "id": "s06",
+      "kind": "specific",
+      "query": "Does kb.filter modify the parent kb's metadata constraints?",
+      "relevant_sources": [
+        "filters.md"
+      ]
+    },
+    {
+      "id": "s07",
+      "kind": "specific",
+      "query": "Which class provides awaitable ask and retrieve methods?",
+      "relevant_sources": [
+        "async.md"
+      ]
+    },
+    {
+      "id": "s08",
+      "kind": "specific",
+      "query": "What is the default auto_update.interval in seconds?",
+      "relevant_sources": [
+        "updates.md"
+      ]
+    },
+    {
+      "id": "p01",
+      "kind": "paraphrase",
+      "query": "I want to find passages without paying for a written response. What should I call?",
+      "relevant_sources": [
+        "citations.md"
+      ]
+    },
+    {
+      "id": "p02",
+      "kind": "paraphrase",
+      "query": "How can I find a small matching passage but still give the answer model the surrounding explanation?",
+      "relevant_sources": [
+        "chunking.md"
+      ]
+    },
+    {
+      "id": "p03",
+      "kind": "paraphrase",
+      "query": "My documents change after ingestion. How does the index catch up without holding up questions?",
+      "relevant_sources": [
+        "updates.md"
+      ]
+    },
+    {
+      "id": "p04",
+      "kind": "paraphrase",
+      "query": "Users paste unusual error numbers that semantic matching misses. What search option helps?",
+      "relevant_sources": [
+        "hybrid-search.md"
+      ]
+    },
+    {
+      "id": "c01",
+      "kind": "conceptual",
+      "query": "How can I improve search results for both exact identifiers and broadly worded questions?",
+      "relevant_sources": [
+        "hybrid-search.md",
+        "query-expansion.md"
+      ]
+    },
+    {
+      "id": "c02",
+      "kind": "conceptual",
+      "query": "Which retrieval improvements add model computation, and what can I disable to reduce latency?",
+      "relevant_sources": [
+        "query-expansion.md",
+        "reranking.md",
+        "hyde.md"
+      ]
+    },
+    {
+      "id": "c03",
+      "kind": "conceptual",
+      "query": "How do I keep a web application responsive while users ask questions and share one decision model?",
+      "relevant_sources": [
+        "async.md"
+      ]
+    },
+    {
+      "id": "c04",
+      "kind": "conceptual",
+      "query": "How do I search only one team's documents while preserving enough surrounding context?",
+      "relevant_sources": [
+        "filters.md",
+        "chunking.md"
+      ]
+    },
+    {
+      "id": "u01",
+      "kind": "unanswerable",
+      "query": "What is the measured p95 latency in milliseconds for llama3.2 on my laptop?",
+      "relevant_sources": []
+    },
+    {
+      "id": "u02",
+      "kind": "unanswerable",
+      "query": "What is the exact enterprise SSO callback URL for Piragi?",
+      "relevant_sources": []
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "dev": {
+    "stage1_noprf_recall_at_10": 77.827,
+    "stage1_prf_recall_at_10": 78.358,
+    "stage1_prf_ndcg_at_10": 66.188,
+    "stage1_prf_recall_at_100": 97.282,
+    "reranked_recall_at_10": 88.645,
+    "reranked_ndcg_at_10": 77.805,
+    "reranked_mrr_at_10": 81.026,
+    "best_config_name": "full_blend",
+    "best_fusion_weight": 0.15,
+    "best_reranker_weights": [
+      1.35,
+      1.0,
+      0.45
+    ],
+    "use_prf": true
+  },
+  "zips": {
+    "primary": "evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_bge-reranker-v2-gemma.zip",
+    "noreranker": "evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_noreranker_sota.zip",
+    "single_bge-reranker-v2-gemma": "evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_bge-reranker-v2-gemma.zip",
+    "single_bge-reranker-v2-m3": "evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_bge-reranker-v2-m3.zip",
+    "single_mmarco-mMiniLMv2-L12-H384-v1": "evals/submissions/airbench_2405/piragi_airbench_2405_longdoc_single_mmarco-mMiniLMv2-L12-H384-v1.zip"
+  },
+  "submission_primary": "<p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!\nRetrieval method: piragi\nReranking model: bge-reranker-v2-gemma\nSubmission revision: ace344c38224db29b7fbb11cbe0d9a76</p>",
+  "submission_bge_reranker_v2_m3": "<p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!\nRetrieval method: piragi\nReranking model: bge-reranker-v2-m3\nSubmission revision: 0db52ee90dba6526f0bb60ce37e48de2</p>",
+  "submission_noreranker": "<p style='color: green; font-size: 20px; text-align: center;'>Thanks for submission!\nRetrieval method: piragi\nReranking model: NoReranker\nSubmission revision: e13f671afedb2975e88f09f4cd3777e6</p>",
+  "telemetry_red": {
+    "hybrid_fusion": {
+      "requests": 15,
+      "errors": 0,
+      "rate_per_sec": 0.0006,
+      "error_rate": 0.0,
+      "p50_ms": 1692.335,
+      "p95_ms": 7776.153,
+      "p99_ms": 7776.153
+    },
+    "embed": {
+      "requests": 60,
+      "errors": 0,
+      "rate_per_sec": 0.0024,
+      "error_rate": 0.0,
+      "p50_ms": 7290.77,
+      "p95_ms": 42920.852,
+      "p99_ms": 81582.551
+    },
+    "rerank": {
+      "requests": 45,
+      "errors": 0,
+      "rate_per_sec": 0.0018,
+      "error_rate": 0.0,
+      "p50_ms": 226971.196,
+      "p95_ms": 1430247.328,
+      "p99_ms": 1491975.978
+    }
+  }
+}

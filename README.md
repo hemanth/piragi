@@ -9,7 +9,7 @@ kb = Ragi(["./docs", "s3://bucket/data/**/*.pdf", "https://api.example.com/docs"
 answer = kb.ask("How do I deploy this?")
 ```
 
-Built-in vector store, embeddings, citations, and auto-updates. Free & local by default.
+Built-in vector store, embeddings, citations, and auto-updates. Free & local by default. Ranked **#1 Overall** on the live [AIR-Bench 24.05 Long-Doc Leaderboard](https://huggingface.co/spaces/AIR-Bench/leaderboard) (`84.96%` Recall@10, `75.72%` nDCG@10, `80.10%` MRR@10 — [details](LEADERBOARD_GUIDE.md)).
 
 ## Installation
 
@@ -149,6 +149,21 @@ kb = Ragi("./docs", config={
 })
 ```
 
+## Local Evidence Decisions (SemIf / OpenJev)
+
+Optionally judge retrieved passages before the answer model sees them:
+
+```python
+kb = Ragi("./docs", config={"decision": {"engine": "openjev"}})
+```
+
+Requires a separate SemIf installation. Piragi selects the device and downloads/caches
+a pinned model on the first decision. `model_path` is an optional offline override.
+Piragi retrieves a wider hybrid candidate pool, batches relevance judgments, then checks
+whether the retained passages support an answer. Insufficient evidence skips generation;
+inference errors fall back to ordinary retrieval and appear in `answer.decision`. Scores
+are not calibrated confidence. See [setup, behavior, and evaluation](docs/local-decisions.md).
+
 ## Chunking Strategies
 
 ```python
@@ -272,23 +287,35 @@ retrieve.run("What is X?")
 
 Pipelines offer fine-grained control over ingestion and parallelized retrieval.
 
+## Observability
+
+Built-in RED/USE metrics (`p50`/`p95`/`p99`), W3C distributed traces, structured JSON logs, and symptom alerts — zero setup:
+
+```python
+stats = kb.stats()
+print(stats["red"]["ask"])   # {'requests': 12, 'errors': 0, 'p50_ms': 41.2, 'p99_ms': 89.4, ...}
+print(stats["alerts"])       # Active symptom-based alerts linked to docs/runbooks/
+```
+
 ## API
 
 ```python
 # Sync API
 kb = Ragi(sources, persist_dir=".piragi", config=None, store=None, graph=False)
 kb.add("./more-docs")
-kb.ask(query, top_k=5)
+text, citations = kb.ask(query, top_k=5)
 kb.retrieve(query, top_k=5)
 kb.filter(**metadata).ask(query)  # Thread-safe filtering returns FilteredRagi
 kb.refresh("./docs")
 kb.count()
+kb.stats()
 kb.clear()
 
 # Async API (same methods, just await them)
 kb = AsyncRagi(sources, persist_dir=".piragi", config=None, store=None, graph=False)
 await kb.add("./more-docs")
-await kb.ask(query, top_k=5)
+text, citations = await kb.ask(query, top_k=5)
+await kb.stats()
 ```
 
 Full docs: [API.md](API.md)
