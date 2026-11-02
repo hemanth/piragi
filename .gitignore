@@ -53,3 +53,6 @@ lancedb/
 Thumbs.db
 test_env/
 CLAUDE.md
+.agents/
+evals/submissions/airbench_2405/*.zip
+evals/results/openjev-*/

@@ -18,6 +18,7 @@ Use sentence-transformers models that run locally on your machine.
 No API calls, completely free, and works offline.
 
 Examples:
+- google/embeddinggemma-2 (768d multimodal & MRL text/code/image/audio embeddings)
 - sentence-transformers/all-MiniLM-L6-v2 (fast, lightweight)
 - nvidia/llama-embed-nemotron-8b (high quality, requires auth)
 - any model from HuggingFace sentence-transformers

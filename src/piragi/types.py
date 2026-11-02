@@ -24,6 +24,11 @@ class Answer(BaseModel):
     text: str = Field(description="The generated answer")
     citations: List[Citation] = Field(default_factory=list, description="Source citations")
     query: str = Field(description="Original query")
+    decision: Optional[Dict[str, Any]] = Field(default=None, description="Evidence judgments and fallback status")
+    unreferenced_citations: List[Citation] = Field(
+        default_factory=list,
+        description="Citations provided to context but not cited in text",
+    )
 
     def __str__(self) -> str:
         """Return the answer text."""

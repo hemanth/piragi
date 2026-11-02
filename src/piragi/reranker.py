@@ -26,6 +26,9 @@ class CrossEncoderReranker:
         device: Optional[str] = None,
         batch_size: int = 32,
         trust_remote_code: bool = False,
+        max_length: Optional[int] = None,
+        fusion_weight: float = 0.0,
+        telemetry: Optional[object] = None,
     ) -> None:
         """
         Initialize the cross-encoder reranker.
@@ -37,16 +40,23 @@ class CrossEncoderReranker:
                 - "BAAI/bge-reranker-base" (good multilingual support)
                 - "BAAI/bge-reranker-large" (best quality, slowest)
                 - "Alibaba-NLP/gte-multilingual-reranker-base" (requires trust_remote_code=True)
-            device: Device to run on ('cuda', 'cpu', or None for auto-detect)
+            device: Device to run on ('cuda', 'cpu', 'mps', or None for auto-detect)
             batch_size: Batch size for scoring
             trust_remote_code: Whether to trust remote code for custom models
                 (required for some models like Alibaba-NLP/gte-multilingual-reranker-base)
+            max_length: Optional tokenizer max_length cap to reduce padding latency
+            fusion_weight: Optional weight (0.0-1.0) blending first-stage retrieval rank/score
+                with cross-encoder score for consensus stability
+            telemetry: Optional TelemetryCollector instance
         """
         self.model_name = model_name
         self.batch_size = batch_size
         self._model = None
         self._device = device
         self._trust_remote_code = trust_remote_code
+        self.max_length = max_length
+        self.fusion_weight = fusion_weight
+        self._telemetry = telemetry
 
     def _load_model(self):
         """Lazy load the cross-encoder model."""
@@ -54,10 +64,16 @@ class CrossEncoderReranker:
             try:
                 from sentence_transformers import CrossEncoder
 
+                ce_kwargs = {
+                    "device": self._device,
+                    "trust_remote_code": self._trust_remote_code,
+                }
+                if self.max_length is not None:
+                    ce_kwargs["max_length"] = self.max_length
+
                 self._model = CrossEncoder(
                     self.model_name,
-                    device=self._device,
-                    trust_remote_code=self._trust_remote_code,
+                    **ce_kwargs,
                 )
                 
                 # Fix for models without pad_token_id (e.g., Qwen3 rerankers)
@@ -71,13 +87,13 @@ class CrossEncoderReranker:
                             eos = getattr(cfg, "eos_token_id", None)
                             if eos is not None:
                                 cfg.pad_token_id = eos
-                                logger.debug(f"Missing pad_token_id detected; set to eos_token_id={eos}")
+                                logger.debug("Missing pad_token_id detected; set to eos_token_id={}".format(eos))
                             else:
                                 logger.warning("Neither pad_token_id nor eos_token_id present in model config")
                 except Exception as e:
-                    logger.warning(f"Failed to adjust pad_token_id on CrossEncoder: {e}")
+                    logger.warning("Failed to adjust pad_token_id on CrossEncoder: {}".format(e))
                 
-                logger.info(f"Loaded cross-encoder model: {self.model_name}")
+                logger.info("Loaded cross-encoder model: {}".format(self.model_name))
             except ImportError:
                 raise ImportError(
                     "sentence-transformers is required for cross-encoder reranking. "
@@ -90,14 +106,16 @@ class CrossEncoderReranker:
         query: str,
         citations: List[Citation],
         top_k: Optional[int] = None,
+        fusion_weight: Optional[float] = None,
     ) -> List[Citation]:
         """
-        Rerank citations using cross-encoder scoring.
+        Rerank citations using length-sorted cross-encoder scoring and optional stage fusion.
 
         Args:
             query: The search query
             citations: List of citations to rerank
             top_k: Number of top results to return (None = return all)
+            fusion_weight: Optional override for first-stage score fusion weight (0.0-1.0)
 
         Returns:
             Reranked citations with updated scores
@@ -108,37 +126,71 @@ class CrossEncoderReranker:
         if len(citations) == 1:
             return citations
 
-        model = self._load_model()
+        from .telemetry import get_telemetry
+        tel = self._telemetry if self._telemetry is not None else get_telemetry()
 
-        # Prepare query-passage pairs
-        pairs = [(query, citation.chunk) for citation in citations]
+        with tel.span(
+            "rerank.cross_encoder",
+            operation="rerank",
+            provider="cross_encoder",
+            candidateCount=len(citations),
+            topK=top_k if top_k is not None else len(citations),
+        ):
+            model = self._load_model()
 
-        # Score all pairs
-        scores = model.predict(pairs, batch_size=self.batch_size)
+            # Prepare query-passage pairs
+            pairs = [(query, citation.chunk) for citation in citations]
 
-        # Normalize scores to 0-1 range using sigmoid
-        import numpy as np
-        normalized_scores = 1 / (1 + np.exp(-scores))
+            import numpy as np
 
-        # Create new citations with updated scores
-        scored_citations = []
-        for citation, score in zip(citations, normalized_scores):
-            new_citation = Citation(
-                source=citation.source,
-                chunk=citation.chunk,
-                score=float(score),
-                metadata=citation.metadata,
-            )
-            scored_citations.append(new_citation)
+            # Length-sort across multi-batch inputs to minimize sequence padding waste on GPU/MPS/CPU
+            if len(pairs) > self.batch_size:
+                order = sorted(range(len(pairs)), key=lambda idx: len(pairs[idx][1]))
+                sorted_pairs = [pairs[idx] for idx in order]
+                sorted_raw = np.asarray(model.predict(sorted_pairs, batch_size=self.batch_size), dtype=np.float64)
+                scores = np.empty(len(pairs), dtype=np.float64)
+                for pos, orig_idx in enumerate(order):
+                    scores[orig_idx] = sorted_raw[pos]
+            else:
+                scores = np.asarray(model.predict(pairs, batch_size=self.batch_size), dtype=np.float64)
 
-        # Sort by score descending
-        scored_citations.sort(key=lambda c: c.score, reverse=True)
+            # Normalize scores to 0-1 range using numerically stable sigmoid
+            clipped = np.clip(scores, -50.0, 50.0)
+            normalized_scores = 1.0 / (1.0 + np.exp(-clipped))
 
-        # Return top_k if specified
-        if top_k is not None:
-            return scored_citations[:top_k]
+            blend = self.fusion_weight if fusion_weight is None else float(fusion_weight)
+            if blend > 0.0:
+                # Min-max normalize first-stage scores or fall back to reciprocal rank
+                stage1_raw = np.array([float(c.score) for c in citations], dtype=np.float64)
+                s_min = float(np.min(stage1_raw))
+                s_max = float(np.max(stage1_raw))
+                if s_max > s_min:
+                    stage1_norm = (stage1_raw - s_min) / (s_max - s_min)
+                else:
+                    ranks = np.arange(1.0, len(citations) + 1.0)
+                    stage1_norm = 1.0 / (60.0 + ranks)
+                    stage1_norm = stage1_norm / float(np.max(stage1_norm))
+                normalized_scores = (1.0 - blend) * normalized_scores + blend * stage1_norm
 
-        return scored_citations
+            # Create new citations with updated scores
+            scored_citations = []
+            for citation, score in zip(citations, normalized_scores):
+                new_citation = Citation(
+                    source=citation.source,
+                    chunk=citation.chunk,
+                    score=float(score),
+                    metadata=citation.metadata,
+                )
+                scored_citations.append(new_citation)
+
+            # Sort by score descending
+            scored_citations.sort(key=lambda c: c.score, reverse=True)
+
+            # Return top_k if specified
+            if top_k is not None:
+                return scored_citations[:top_k]
+
+            return scored_citations
 
     def score_pair(self, query: str, passage: str) -> float:
         """

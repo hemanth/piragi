@@ -8,17 +8,27 @@ from queue import Queue, Empty
 import logging
 
 from .change_detection import ChangeDetector
+from .telemetry import (
+    capture_context_metadata,
+    get_telemetry,
+    parse_traceparent,
+    request_context,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class UpdateTask:
-    """Represents an update task."""
+    """Represents an update task with correlation & trace metadata across queue boundaries."""
 
-    def __init__(self, source: str, priority: int = 0):
+    def __init__(self, source: str, priority: int = 0, trace_meta: Optional[Dict[str, str]] = None):
         self.source = source
         self.priority = priority
         self.created_at = time.time()
+        meta = trace_meta or capture_context_metadata(default_entry_point="background_updater")
+        self.request_id = meta.get("request_id")
+        self.entry_point = "background_updater"
+        self.traceparent = meta.get("traceparent")
 
 
 class AsyncUpdater:
@@ -34,6 +44,7 @@ class AsyncUpdater:
         refresh_callback: Callable[[Union[str, List[str]]], None],
         check_interval: float = 300.0,
         max_workers: int = 2,
+        telemetry: Any = None,
     ):
         """
         Initialize the async updater.
@@ -42,10 +53,12 @@ class AsyncUpdater:
             refresh_callback: Function to call when refresh is needed (e.g., kb.refresh)
             check_interval: Default interval between checks in seconds
             max_workers: Number of background workers
+            telemetry: Optional TelemetryCollector instance
         """
         self.refresh_callback = refresh_callback
         self.check_interval = check_interval
         self.max_workers = max_workers
+        self._telemetry = telemetry
 
         # Source metadata tracking
         self.sources_metadata: Dict[str, Dict[str, Any]] = {}
@@ -159,9 +172,16 @@ class AsyncUpdater:
                         ):
                             sources_to_check.append(source)
 
-                # Queue checks
+                # Queue checks with fresh correlation metadata per scheduled run
                 for source in sources_to_check:
-                    self.update_queue.put(UpdateTask(source))
+                    with request_context(entry_point="background_updater", preserve_existing=False):
+                        self.update_queue.put(UpdateTask(source))
+
+                tel = self._telemetry if self._telemetry is not None else get_telemetry()
+                tel.record_updater_queue(
+                    queue_depth=self.update_queue.qsize(),
+                    workers=self.max_workers,
+                )
 
                 self.stats["last_check_time"] = current_time
 
@@ -169,7 +189,13 @@ class AsyncUpdater:
                 self._stop_event.wait(timeout=10)
 
             except Exception as e:
-                logger.error(f"Scheduler error: {e}")
+                logger.error("Scheduler error: {}".format(e))
+                tel = self._telemetry if self._telemetry is not None else get_telemetry()
+                tel.record_updater_queue(
+                    queue_depth=self.update_queue.qsize(),
+                    workers=self.max_workers,
+                    error=True,
+                )
                 self._stop_event.wait(timeout=10)
 
     def _worker_loop(self) -> None:
@@ -185,13 +211,28 @@ class AsyncUpdater:
                 except Empty:
                     continue
 
-                # Process the update task
-                self._check_and_refresh(task.source)
+                tel = self._telemetry if self._telemetry is not None else get_telemetry()
+                task_age_s = max(0.0, time.time() - task.created_at)
+                tel.record_updater_queue(
+                    queue_depth=self.update_queue.qsize(),
+                    workers=self.max_workers,
+                    oldest_task_age_s=task_age_s,
+                )
+
+                trace_id, parent_span_id, _ = parse_traceparent(task.traceparent)
+                with request_context(
+                    entry_point="background_updater",
+                    request_id=task.request_id,
+                    trace_id=trace_id,
+                    parent_span_id=parent_span_id,
+                    preserve_existing=False,
+                ):
+                    self._check_and_refresh(task.source)
 
                 self.update_queue.task_done()
 
             except Exception as e:
-                logger.error(f"Worker error: {e}")
+                logger.error("Worker error: {}".format(e))
 
     def _check_and_refresh(self, source: str) -> None:
         """
@@ -200,6 +241,7 @@ class AsyncUpdater:
         Args:
             source: Source to check
         """
+        tel = self._telemetry if self._telemetry is not None else get_telemetry()
         try:
             with self._lock:
                 if source not in self.sources_metadata:
@@ -237,16 +279,25 @@ class AsyncUpdater:
 
             # Refresh if changed
             if changed:
-                logger.info(f"Change detected in {source}, refreshing...")
-                self.refresh_callback(source)
+                logger.info("Change detected in {}, refreshing...".format(source))
+                with tel.span("ragi.background_refresh", operation="refresh", provider="local"):
+                    self.refresh_callback(source)
                 self.stats["updates_performed"] += 1
 
-                # Update metadata after refresh
-                # Note: In production, you'd want to read the new content and hash
-                # For now, we just update the timestamp
-
         except Exception as e:
-            logger.error(f"Error checking source {source}: {e}")
+            logger.error("Error checking source {}: {}".format(source, e))
+            tel.record_updater_queue(
+                queue_depth=self.update_queue.qsize(),
+                workers=self.max_workers,
+                error=True,
+            )
+            tel.log(
+                "error",
+                "updater_refresh_failed",
+                operation="refresh",
+                provider="local",
+                errorType=type(e).__name__,
+            )
 
     def queue_update(self, source: str, priority: int = 0) -> None:
         """

@@ -25,6 +25,9 @@ EMBEDDING_DIMENSIONS = {
     "BAAI/bge-small-en-v1.5": 384,
     "BAAI/bge-base-en-v1.5": 768,
     "BAAI/bge-large-en-v1.5": 1024,
+    "google/embeddinggemma-2": 768,
+    "embeddinggemma-2": 768,
+    "google/embeddinggemma-300m": 768,
 }
 
 

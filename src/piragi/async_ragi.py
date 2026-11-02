@@ -7,7 +7,8 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Union
 from .core import Ragi
 from .embeddings import EmbeddingGenerator
 from .stores import VectorStoreProtocol
-from .types import Answer
+from .types import Answer, Citation
+from .decisions import DecisionEngine
 
 
 class AsyncRagi:
@@ -48,6 +49,7 @@ class AsyncRagi:
         store: Union[str, Dict[str, Any], VectorStoreProtocol, None] = None,
         graph: bool = False,
         embedder: Optional[EmbeddingGenerator] = None,
+        decision_engine: Optional[DecisionEngine] = None,
     ) -> None:
         """
         Initialize AsyncRagi with optional document sources.
@@ -58,6 +60,7 @@ class AsyncRagi:
             config: Configuration dict (see Ragi for options)
             store: Vector store backend
             graph: Enable knowledge graph
+            decision_engine: Optional shared scorer (enable via decision.engine in config).
             embedder: Optional custom EmbeddingGenerator instance. If provided, this
                 embedder will be used instead of creating a new one from config.
                 Useful for sharing a single embedder across multiple AsyncRagi instances.
@@ -69,6 +72,7 @@ class AsyncRagi:
             store=store,
             graph=graph,
             embedder=embedder,
+            decision_engine=decision_engine,
         )
 
     def add(
@@ -115,9 +119,14 @@ class AsyncRagi:
         Returns:
             Answer with citations
         """
-        return await asyncio.to_thread(
-            self._sync.ask, query, top_k, system_prompt
-        )
+        from .telemetry import request_context
+        with request_context(
+            entry_point="async_api",
+            sample_rate=self._sync.config.telemetry.sample_rate,
+        ):
+            return await asyncio.to_thread(
+                self._sync.ask, query, top_k, system_prompt
+            )
 
     async def retrieve(self, query: str, top_k: int = 5) -> List:
         """
@@ -130,7 +139,12 @@ class AsyncRagi:
         Returns:
             List of Citation objects
         """
-        return await asyncio.to_thread(self._sync.retrieve, query, top_k)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="async_api",
+            sample_rate=self._sync.config.telemetry.sample_rate,
+        ):
+            return await asyncio.to_thread(self._sync.retrieve, query, top_k)
 
     async def refresh(self, sources: Union[str, List[str]]) -> "AsyncRagi":
         """
@@ -142,25 +156,38 @@ class AsyncRagi:
         Returns:
             Self for chaining
         """
-        await asyncio.to_thread(self._sync.refresh, sources)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="async_api",
+            sample_rate=self._sync.config.telemetry.sample_rate,
+        ):
+            await asyncio.to_thread(self._sync.refresh, sources)
         return self
 
-    def filter(self, **kwargs: Any) -> "AsyncRagi":
+    def filter(self, **kwargs: Any) -> "AsyncFilteredRagi":
         """
-        Filter documents by metadata for the next query.
+        Filter documents by metadata for queries.
 
         Args:
             **kwargs: Metadata key-value pairs to filter by
 
         Returns:
-            Self for chaining
+            AsyncFilteredRagi bound with specified filters
         """
-        self._sync.filter(**kwargs)
-        return self
+        return AsyncFilteredRagi(self, kwargs)
 
     async def count(self) -> int:
         """Return the number of chunks in the knowledge base."""
         return await asyncio.to_thread(self._sync.count)
+
+    async def stats(self) -> Dict[str, Any]:
+        """Return observability snapshot (RED p50/p95/p99, USE cache/queue, traces, alerts)."""
+        return await asyncio.to_thread(self._sync.stats)
+
+    @property
+    def telemetry(self):
+        """Access the underlying TelemetryCollector."""
+        return self._sync.telemetry
 
     async def clear(self) -> None:
         """Clear all data from the knowledge base."""
@@ -187,7 +214,12 @@ class _AddAwaitable:
         return self._run().__await__()
 
     async def _run(self) -> AsyncRagi:
-        await asyncio.to_thread(self._ragi._sync.add, self._sources)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="async_api",
+            sample_rate=self._ragi._sync.config.telemetry.sample_rate,
+        ):
+            await asyncio.to_thread(self._ragi._sync.add, self._sources)
         return self._ragi
 
 
@@ -221,12 +253,70 @@ class _AddIterator:
         return msg
 
     async def _run_in_thread(self) -> None:
+        from .telemetry import request_context
+
         def on_progress(msg: str) -> None:
             self._loop.call_soon_threadsafe(self._queue.put_nowait, msg)
 
         try:
-            await asyncio.to_thread(
-                self._ragi._sync.add, self._sources, on_progress
-            )
+            with request_context(
+                entry_point="async_api",
+                sample_rate=self._ragi._sync.config.telemetry.sample_rate,
+            ):
+                await asyncio.to_thread(
+                    self._ragi._sync.add, self._sources, on_progress
+                )
         finally:
             self._loop.call_soon_threadsafe(self._queue.put_nowait, self._DONE)
+
+
+class AsyncFilteredRagi:
+    """Async wrapper for Ragi that binds specific metadata filters."""
+
+    def __init__(self, async_ragi: AsyncRagi, filters: Dict[str, Any]) -> None:
+        self._async_ragi = async_ragi
+        self._filters = filters
+
+    async def ask(
+        self,
+        query: str,
+        top_k: int = 5,
+        system_prompt: Optional[str] = None,
+    ) -> Answer:
+        """Ask a question with bound filters (non-blocking)."""
+        from .telemetry import request_context
+        with request_context(
+            entry_point="filtered_api",
+            sample_rate=self._async_ragi._sync.config.telemetry.sample_rate,
+        ):
+            return await asyncio.to_thread(
+                self._async_ragi._sync._ask_with_filters,
+                query,
+                top_k,
+                system_prompt,
+                self._filters,
+            )
+
+    async def retrieve(self, query: str, top_k: int = 5) -> List[Citation]:
+        """Retrieve relevant chunks matching bound filters (non-blocking)."""
+        from .telemetry import request_context
+        with request_context(
+            entry_point="filtered_api",
+            sample_rate=self._async_ragi._sync.config.telemetry.sample_rate,
+        ):
+            return await asyncio.to_thread(
+                self._async_ragi._sync._retrieve_with_filters,
+                query,
+                top_k,
+                self._filters,
+            )
+
+    def filter(self, **kwargs: Any) -> "AsyncFilteredRagi":
+        """Chain additional metadata filters."""
+        new_filters = {**self._filters, **kwargs}
+        return AsyncFilteredRagi(self._async_ragi, new_filters)
+
+    async def __call__(self, query: str, top_k: int = 5) -> Answer:
+        """Callable shorthand for ask()."""
+        return await self.ask(query, top_k=top_k)
+

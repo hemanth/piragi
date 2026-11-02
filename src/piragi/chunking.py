@@ -4,7 +4,7 @@ import re
 from typing import List
 
 import pysbd
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from .types import Chunk, Document
 
@@ -34,7 +34,15 @@ class Chunker:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.min_chunk_length = min_chunk_length
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        # This checkpoint supplies tokenizer.json with a generic tokenizer class.
+        # Transformers 5's auto loader instead consults its custom model config,
+        # which chunking neither needs nor should execute.
+        tokenizer_cls = (
+            PreTrainedTokenizerFast
+            if tokenizer_name == "nvidia/llama-embed-nemotron-8b"
+            else AutoTokenizer
+        )
+        self.tokenizer = tokenizer_cls.from_pretrained(tokenizer_name)
         self._segmenter = pysbd.Segmenter(language="en", clean=False)
 
     def chunk_document(self, document: Document) -> List[Chunk]:

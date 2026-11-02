@@ -572,6 +572,9 @@ class HierarchicalChunker:
                 )
                 child_idx += 1
 
+            if end >= len(parent_text):
+                break
+
             # Ensure we make progress (avoid infinite loop)
             new_start = end - self.overlap
             start = max(new_start, start + 1)

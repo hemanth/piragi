@@ -3512,6 +3512,8 @@ name = "piragi"
 version = "1.2.1"
 source = { editable = "." }
 dependencies = [
+    { name = "gcsfs" },
+    { name = "google-auth" },
     { name = "lancedb" },
     { name = "markitdown", extra = ["all"] },
     { name = "openai" },
@@ -3606,9 +3608,11 @@ requires-dist = [
     { name = "fsspec", marker = "extra == 'gcs'", specifier = ">=2023.1.0" },
     { name = "fsspec", marker = "extra == 'remote'", specifier = ">=2023.1.0" },
     { name = "fsspec", marker = "extra == 's3'", specifier = ">=2023.1.0" },
+    { name = "gcsfs", specifier = ">=2025.12.0" },
     { name = "gcsfs", marker = "extra == 'all'", specifier = ">=2023.1.0" },
     { name = "gcsfs", marker = "extra == 'gcs'", specifier = ">=2023.1.0" },
     { name = "gcsfs", marker = "extra == 'remote'", specifier = ">=2023.1.0" },
+    { name = "google-auth", specifier = ">=2.45.0" },
     { name = "lancedb", specifier = ">=0.3.0" },
     { name = "markitdown", extras = ["all"], specifier = ">=0.0.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },

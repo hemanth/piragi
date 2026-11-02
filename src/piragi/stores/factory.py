@@ -31,8 +31,8 @@ def parse_store_uri(uri: str) -> Dict[str, Any]:
     parsed = urlparse(uri)
     scheme = parsed.scheme.lower()
 
-    if scheme == "s3":
-        # S3-backed LanceDB
+    if scheme in ("s3", "gs", "gcs"):
+        # Cloud object storage-backed LanceDB (S3, GCS)
         return {"type": "lance", "uri": uri}
 
     elif scheme in ("postgres", "postgresql"):

@@ -115,18 +115,34 @@ class PlaygroundHandler(SimpleHTTPRequestHandler):
     def _cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Request-ID, traceparent")
 
     def _json_response(self, data, status=200):
+        from piragi.telemetry import current_request_id
         body = json.dumps(data).encode()
         self.send_response(status)
         self._cors_headers()
+        req_id = current_request_id()
+        if req_id:
+            self.send_header("X-Request-ID", req_id)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def _handle_exec(self):
+        from piragi.telemetry import extract_inbound_headers, request_context
+        inbound = extract_inbound_headers(dict(self.headers))
+        with request_context(
+            entry_point="playground_http",
+            request_id=inbound.get("request_id"),
+            trace_id=inbound.get("trace_id"),
+            parent_span_id=inbound.get("parent_span_id"),
+            preserve_existing=False,
+        ):
+            self._handle_exec_inner()
+
+    def _handle_exec_inner(self):
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))

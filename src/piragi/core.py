@@ -11,6 +11,7 @@ from .stores import VectorStoreProtocol, create_store
 from .types import Answer, Chunk, Citation, Document, ChunkHook, DocumentHook
 from .async_updater import AsyncUpdater
 from .change_detection import ChangeDetector
+from .decisions import DecisionEngine, SemIfDecisionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class Ragi:
         hooks: Optional[Dict[str, Any]] = None,
         graph: bool = False,
         embedder: Optional[EmbeddingGenerator] = None,
+        decision_engine: Optional[DecisionEngine] = None,
     ) -> None:
         """
         Initialize Ragi with optional document sources.
@@ -120,6 +122,9 @@ class Ragi:
                 embedder will be used instead of creating a new one from config.
                 Useful for sharing a single embedder across multiple Ragi instances
                 to reduce memory usage and loading time.
+            decision_engine: Optional shared evidence scorer. Enable with
+                decision.engine="openjev" or decision.enabled=True. Without a
+                supplied scorer, Piragi selects a runtime and caches the default model.
 
         Examples:
             >>> # Use defaults
@@ -161,6 +166,31 @@ class Ragi:
         else:
             self.config = RagiConfig()
 
+        from .telemetry import TelemetryCollector
+        self.telemetry = TelemetryCollector(
+            enabled=self.config.telemetry.enabled,
+            structured_logs=self.config.telemetry.structured_logs,
+            sample_rate=self.config.telemetry.sample_rate,
+        )
+
+        self.decision_engine = None
+        decision_cfg = self.config.decision
+        if decision_cfg.enabled:
+            if decision_engine is not None:
+                self.decision_engine = decision_engine
+            else:
+                self.decision_engine = SemIfDecisionEngine(
+                    model_path=decision_cfg.model_path,
+                    revision=decision_cfg.revision,
+                    backend=decision_cfg.backend,
+                    device=decision_cfg.device,
+                    dtype=decision_cfg.dtype,
+                    max_tokens=decision_cfg.max_tokens,
+                    cache_dir=decision_cfg.cache_dir,
+                    local_files_only=decision_cfg.local_files_only,
+                    mlx_bits=decision_cfg.mlx_bits,
+                )
+
         cfg = config or {}
 
         # Store config for later use
@@ -172,6 +202,7 @@ class Ragi:
             api_key=self.config.llm.api_key,
             base_url=self.config.llm.base_url,
             temperature=self.config.llm.temperature,
+            telemetry=self.telemetry,
         )
 
         # Initialize components
@@ -240,6 +271,7 @@ class Ragi:
         self._use_hyde = self.config.retrieval.use_hyde
         self._use_hybrid_search = self.config.retrieval.use_hybrid_search
         self._use_cross_encoder = self.config.retrieval.use_cross_encoder
+        self._use_step_back = self.config.retrieval.use_step_back
 
         # Initialize advanced retrieval components
         self._hyde = None
@@ -248,6 +280,7 @@ class Ragi:
         self._query_rewriter = None
         self._bm25_index = None
         self._on_the_fly_index = None
+        self._step_back = None
 
         if self.config.retrieval.use_query_rewrite:
             from .query_transform import QueryRewriter
@@ -267,12 +300,19 @@ class Ragi:
                 llm_client=self.llm_client,
             )
 
+        if self._use_step_back:
+            from .query_transform import StepBackPrompting
+            self._step_back = StepBackPrompting(
+                llm_client=self.llm_client,
+            )
+
         if self._use_hybrid_search:
             from .hybrid_search import HybridSearcher
             self._hybrid_searcher = HybridSearcher(
                 vector_weight=self.config.retrieval.vector_weight,
                 bm25_weight=self.config.retrieval.bm25_weight,
                 use_rrf=self.config.retrieval.use_rrf,
+                telemetry=self.telemetry,
             )
 
         if self._use_cross_encoder:
@@ -281,13 +321,21 @@ class Ragi:
                 model_name=self.config.retrieval.cross_encoder_model,
                 device=self.config.retrieval.cross_encoder_device or self.config.embedding.device,
                 trust_remote_code=self.config.retrieval.trust_remote_code,
+                fusion_weight=self.config.retrieval.rerank_fusion_weight,
+                telemetry=self.telemetry,
             )
 
         # LLM / Basic retriever
         self.retriever = Retriever(
             llm_client=self.llm_client,
-            enable_reranking=self.config.llm.enable_reranking and not self._use_cross_encoder,
+            enable_reranking=(
+                self.config.llm.enable_reranking
+                and not self._use_cross_encoder
+                and self.decision_engine is None
+            ),
             enable_query_expansion=self.config.llm.enable_query_expansion and not self._use_hyde,
+            context_ordering=self.config.retrieval.context_ordering,
+            prune_unreferenced_citations=self.config.retrieval.prune_unreferenced_citations,
         )
 
         # State for filtering
@@ -312,6 +360,7 @@ class Ragi:
                 refresh_callback=self._background_refresh,
                 check_interval=interval,
                 max_workers=workers,
+                telemetry=self.telemetry,
             )
             self._updater.start()
 
@@ -326,6 +375,7 @@ class Ragi:
             self._graph = KnowledgeGraph(persist_path=graph_path)
 
         from .pipelines.retrieval import RetrievalPipeline
+        from .evidence import EvidenceJudge
         self._retrieval_pipeline = RetrievalPipeline(
             embedder=self.embedder,
             store=self.store,
@@ -339,6 +389,18 @@ class Ragi:
             query_rewriter=self._query_rewriter,
             bm25_index=self._bm25_index,
             on_the_fly_index=self._on_the_fly_index,
+            step_back=self._step_back,
+            auto_merge_parents=self.config.retrieval.auto_merge_parents,
+            context_ordering=self.config.retrieval.context_ordering,
+            prune_unreferenced_citations=self.config.retrieval.prune_unreferenced_citations,
+            rerank_top_n=self.config.retrieval.rerank_top_n,
+            rerank_fusion_weight=self.config.retrieval.rerank_fusion_weight,
+            telemetry=self.telemetry,
+            evidence_judge=(
+                EvidenceJudge(self.decision_engine, decision_cfg.min_score, decision_cfg.min_margin)
+                if self.decision_engine is not None else None
+            ),
+            candidate_k=decision_cfg.candidate_k,
         )
 
         # Load initial sources if provided
@@ -383,6 +445,7 @@ class Ragi:
             return docs
 
         from .pipelines.ingestion import IngestionPipeline
+        from .telemetry import request_context
         pipeline = IngestionPipeline(
             loader=self.loader,
             chunker=self.chunker,
@@ -397,6 +460,7 @@ class Ragi:
             mode=self._mode,
             bm25_index=self._bm25_index,
             on_the_fly_index=self._on_the_fly_index,
+            telemetry=self.telemetry,
         )
         
         # Determine the llm_client to pass for graph extraction
@@ -417,11 +481,15 @@ class Ragi:
             else:
                 logger.info(msg)
 
-        pipeline.ingest(
-            sources, 
-            on_progress=_progress,
-            llm_client=llm_client
-        )
+        with request_context(
+            entry_point="sync_api",
+            sample_rate=self.config.telemetry.sample_rate,
+        ):
+            pipeline.ingest(
+                sources, 
+                on_progress=_progress,
+                llm_client=llm_client
+            )
 
         return self
 
@@ -433,8 +501,12 @@ class Ragi:
         Args:
             source: Source(s) to refresh
         """
-        # This is called from background thread, so be careful with state
-        self.refresh(source)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="background_updater",
+            sample_rate=self.config.telemetry.sample_rate,
+        ):
+            self.refresh(source)
 
     def ask(
         self,
@@ -453,7 +525,12 @@ class Ragi:
         Returns:
             Answer with citations
         """
-        return self._ask_with_filters(query, top_k, system_prompt, None)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="sync_api",
+            sample_rate=self.config.telemetry.sample_rate,
+        ):
+            return self._ask_with_filters(query, top_k, system_prompt, None)
 
     def _ask_with_filters(
         self,
@@ -487,17 +564,13 @@ class Ragi:
 
         Returns:
             List of Citation objects with text, source, score, and metadata
-
-        Examples:
-            >>> chunks = kb.retrieve("How does authentication work?")
-            >>> for chunk in chunks:
-            ...     print(chunk.text, chunk.source, chunk.score)
-            >>>
-            >>> # Use with your own LLM
-            >>> context = "\\n".join(c.chunk for c in chunks)
-            >>> response = your_llm(f"Based on: {context}\\n\\nQ: {query}")
         """
-        return self._retrieve_with_filters(query, top_k, None)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="sync_api",
+            sample_rate=self.config.telemetry.sample_rate,
+        ):
+            return self._retrieve_with_filters(query, top_k, None)
 
     def _retrieve_with_filters(
         self,
@@ -552,6 +625,14 @@ class Ragi:
             return self._on_the_fly_index.count()
         return 0
 
+    def stats(self) -> Dict[str, Any]:
+        """Return observability snapshot (RED p50/p95/p99, USE cache/queue, traces, alerts)."""
+        snap = self.telemetry.snapshot()
+        return {
+            "chunks": self.count(),
+            **snap,
+        }
+
     @property
     def graph(self):
         """
@@ -586,34 +667,46 @@ class Ragi:
             >>> # Refresh multiple files
             >>> kb.refresh(["./docs/*.pdf", "./README.md"])
         """
-        # Load documents to get their actual source paths
-        documents = self.loader.load(sources)
+        from .telemetry import classify_store_provider, request_context
+        store_prov = classify_store_provider(self.store)
+        with request_context(
+            entry_point="sync_api",
+            sample_rate=self.config.telemetry.sample_rate,
+        ):
+            with self.telemetry.span("ragi.refresh", operation="refresh", provider=store_prov):
+                # Load documents to get their actual source paths
+                documents = self.loader.load(sources)
 
-        # Delete old chunks for each source, across whichever index is active
-        for doc in documents:
-            if self.store is not None:
-                self.store.delete_by_source(doc.source)
-            if self._bm25_index is not None:
-                self._bm25_index.delete_by_source(doc.source)
-            if self._on_the_fly_index is not None:
-                self._on_the_fly_index.delete_by_source(doc.source)
+                # Delete old chunks for each source, across whichever index is active
+                for doc in documents:
+                    if self.store is not None:
+                        self.store.delete_by_source(doc.source)
+                    if self._bm25_index is not None:
+                        self._bm25_index.delete_by_source(doc.source)
+                    if self._on_the_fly_index is not None:
+                        self._on_the_fly_index.delete_by_source(doc.source)
 
-        # Re-add via the same embed/store branching add() uses, so refresh()
-        # behaves correctly under bm25_only/on_the_fly/hot_cold too
-        from .pipelines.ingestion import IngestionPipeline
-        pipeline = IngestionPipeline(
-            loader=self.loader,
-            chunker=self.chunker,
-            embedder=self.embedder,
-            store=self.store,
-            post_chunk_hook=self._post_chunk_hook,
-            post_embed_hook=self._post_embed_hook,
-            use_hierarchical=self._use_hierarchical,
-            mode=self._mode,
-            bm25_index=self._bm25_index,
-            on_the_fly_index=self._on_the_fly_index,
-        )
-        pipeline.ingest(sources)
+                if self._hybrid_searcher:
+                    self._hybrid_searcher.invalidate_bm25_cache()
+
+                # Re-add via the same embed/store branching add() uses, so refresh()
+                # behaves correctly under bm25_only/on_the_fly/hot_cold too
+                from .pipelines.ingestion import IngestionPipeline
+                pipeline = IngestionPipeline(
+                    loader=self.loader,
+                    chunker=self.chunker,
+                    embedder=self.embedder,
+                    store=self.store,
+                    post_chunk_hook=self._post_chunk_hook,
+                    post_embed_hook=self._post_embed_hook,
+                    use_hierarchical=self._use_hierarchical,
+                    mode=self._mode,
+                    bm25_index=self._bm25_index,
+                    on_the_fly_index=self._on_the_fly_index,
+                )
+                pipeline.ingest(sources)
+                if self._hybrid_searcher and self._mode == "dense" and self.store is not None:
+                    self._hybrid_searcher.index_chunks(self.store.get_all_chunk_texts())
 
         return self
 
@@ -632,6 +725,9 @@ class Ragi:
         if self._on_the_fly_index is not None:
             self._on_the_fly_index.clear()
 
+        if self._hybrid_searcher:
+            self._hybrid_searcher.invalidate_bm25_cache()
+
         # Clear knowledge graph if enabled
         if self._graph:
             self._graph.clear()
@@ -649,10 +745,20 @@ class FilteredRagi:
         self._filters = filters
 
     def ask(self, query: str, top_k: int = 5, system_prompt: Optional[str] = None) -> Answer:
-        return self._ragi._ask_with_filters(query, top_k, system_prompt, self._filters)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="filtered_api",
+            sample_rate=self._ragi.config.telemetry.sample_rate,
+        ):
+            return self._ragi._ask_with_filters(query, top_k, system_prompt, self._filters)
 
     def retrieve(self, query: str, top_k: int = 5) -> List[Citation]:
-        return self._ragi._retrieve_with_filters(query, top_k, self._filters)
+        from .telemetry import request_context
+        with request_context(
+            entry_point="filtered_api",
+            sample_rate=self._ragi.config.telemetry.sample_rate,
+        ):
+            return self._ragi._retrieve_with_filters(query, top_k, self._filters)
 
     def filter(self, **kwargs: Any) -> "FilteredRagi":
         new_filters = {**self._filters, **kwargs}

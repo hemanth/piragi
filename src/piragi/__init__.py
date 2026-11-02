@@ -30,12 +30,14 @@ Example:
     ... })
 """
 
-from .core import Ragi
-from .async_ragi import AsyncRagi
+from .core import Ragi, FilteredRagi
+from .async_ragi import AsyncRagi, AsyncFilteredRagi
 from .embeddings import EmbeddingGenerator
 from .types import Answer, Citation
-from .config import RagiConfig
+from .config import RagiConfig, TelemetryConfig
 from .llm_client import LLMClient
+from .telemetry import TelemetryCollector, get_telemetry, request_context
+from .decisions import DecisionEngine, DecisionQuestion, DecisionResult, SemIfDecisionEngine
 from .pipelines.ingestion import IngestionPipeline
 
 # Advanced components (optional imports)
@@ -60,12 +62,22 @@ __version__ = "1.2.1"
 __all__ = [
     # Core
     "Ragi",
+    "FilteredRagi",
     "AsyncRagi",
+    "AsyncFilteredRagi",
     "EmbeddingGenerator",
     "Answer",
     "Citation",
     "RagiConfig",
+    "TelemetryConfig",
+    "TelemetryCollector",
+    "get_telemetry",
+    "request_context",
     "LLMClient",
+    "DecisionEngine",
+    "DecisionQuestion",
+    "DecisionResult",
+    "SemIfDecisionEngine",
     "IngestionPipeline",
     # Vector stores
     "VectorStoreProtocol",
