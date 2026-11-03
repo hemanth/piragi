@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-11-03
+
+### Added
+- **Reasoning-Intensive Retrieval (`ThinkThenRetrieve`, `CausalLLMReranker`, `ListwiseReasoningReranker`)**:
+  - `ThinkThenRetrieve` pre-retrieval Chain-of-Thought query decomposition (`retrieval.use_think_then_retrieve = True`)
+  - `CausalLLMReranker` (`retrieval.reranker_type = "causal_llm"`) supporting single-pass `yes/no` log-odds scoring (`Qwen/Qwen3-Reranker-4B` & `BAAI/bge-reranker-v2-gemma` with `use_cache=False`) and custom `rerank_instruction`
+  - `ListwiseReasoningReranker` (`retrieval.reranker_type = "listwise"`) with sliding-window `<think>...</think><answer>[i] > [j]</answer>` ranking and bracket-injection sanitization
+- **SOTA Hybrid Retrieval, Observability & Benchmarks**:
+  - Weighted Reciprocal Rank Fusion (`use_rrf`), PDF hyphen/linebreak de-gluing, hierarchical parent auto-merging, U-shaped context ordering, and attributed citation pruning
+  - Agentic query rewriting, BM25-only mode, on-the-fly retrieval, and hot/cold storage tiering
+  - Built-in RED/USE observability (`kb.stats()`), W3C distributed trace propagation, and symptom-based alerts
+  - Official **#1 Overall** live standing on Hugging Face **AIR-Bench 24.05 Long-Doc** (`84.96%` Recall@10, `75.72%` nDCG@10) and **`32.61%` Macro `NDCG@10` (`2.87x` BM25)** across all 12 splits of **BRIGHT (`xlangai/BRIGHT`, ICLR 2025)** (`31.43%` fully open-weights)
+  - `optimize_for_leaderboard("bright")` preset and full 12-split `evals/run_bright_live.py` runner with `scipy.sparse` CSR Okapi BM25
+
+### Fixed
+- **Thread-Safe Parallel Context Propagation (`wrap_with_context`)**: Copy `contextvars.Context` per worker invocation (`ctx.copy().run(...)`) so concurrent `ThreadPoolExecutor` query variations never collide on `RuntimeError: cannot enter context`
+- **Boundary & Mock Resilience**: Guard `top_k <= 0` in `RetrievalPipeline.retrieve()` and `LanceStore.search()`, and safely normalize non-float `sample_rate` in `request_context` and `FilteredRagi`
+
 ## [1.2.1] - 2026-08-10
 
 ### Added

@@ -355,7 +355,7 @@ def wrap_with_context(fn: Callable[..., Any]) -> Callable[..., Any]:
     ctx = contextvars.copy_context()
 
     def _wrapped(*args: Any, **kwargs: Any) -> Any:
-        return ctx.run(fn, *args, **kwargs)
+        return ctx.copy().run(fn, *args, **kwargs)
 
     return _wrapped
 
@@ -398,7 +398,8 @@ def request_context(
         tokens.append((_span_id_var, _span_id_var.set(parent_span_id)))
 
     if existing_sampled is None:
-        is_sampled = True if sample_rate >= 1.0 else (random.random() < max(0.0, sample_rate))
+        rate = float(sample_rate) if isinstance(sample_rate, (int, float)) else 1.0
+        is_sampled = True if rate >= 1.0 else (random.random() < max(0.0, rate))
         tokens.append((_sampled_var, _sampled_var.set(is_sampled)))
 
     try:

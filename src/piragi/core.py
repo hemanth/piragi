@@ -272,6 +272,7 @@ class Ragi:
         self._use_hybrid_search = self.config.retrieval.use_hybrid_search
         self._use_cross_encoder = self.config.retrieval.use_cross_encoder
         self._use_step_back = self.config.retrieval.use_step_back
+        self._use_think_then_retrieve = self.config.retrieval.use_think_then_retrieve
 
         # Initialize advanced retrieval components
         self._hyde = None
@@ -281,6 +282,7 @@ class Ragi:
         self._bm25_index = None
         self._on_the_fly_index = None
         self._step_back = None
+        self._think_then_retrieve = None
 
         if self.config.retrieval.use_query_rewrite:
             from .query_transform import QueryRewriter
@@ -306,6 +308,12 @@ class Ragi:
                 llm_client=self.llm_client,
             )
 
+        if self._use_think_then_retrieve:
+            from .query_transform import ThinkThenRetrieve
+            self._think_then_retrieve = ThinkThenRetrieve(
+                llm_client=self.llm_client,
+            )
+
         if self._use_hybrid_search:
             from .hybrid_search import HybridSearcher
             self._hybrid_searcher = HybridSearcher(
@@ -316,14 +324,37 @@ class Ragi:
             )
 
         if self._use_cross_encoder:
-            from .reranker import CrossEncoderReranker
-            self._cross_encoder = CrossEncoderReranker(
-                model_name=self.config.retrieval.cross_encoder_model,
-                device=self.config.retrieval.cross_encoder_device or self.config.embedding.device,
-                trust_remote_code=self.config.retrieval.trust_remote_code,
-                fusion_weight=self.config.retrieval.rerank_fusion_weight,
-                telemetry=self.telemetry,
-            )
+            reranker_type = self.config.retrieval.reranker_type
+            ce_device = self.config.retrieval.cross_encoder_device or self.config.embedding.device
+            if reranker_type == "listwise":
+                from .reranker import ListwiseReasoningReranker
+                self._cross_encoder = ListwiseReasoningReranker(
+                    llm_client=self.llm_client,
+                    window_size=self.config.retrieval.listwise_window_size,
+                    step_size=self.config.retrieval.listwise_step_size,
+                    fusion_weight=self.config.retrieval.rerank_fusion_weight,
+                    device=ce_device,
+                    telemetry=self.telemetry,
+                )
+            elif reranker_type == "causal_llm":
+                from .reranker import CausalLLMReranker
+                self._cross_encoder = CausalLLMReranker(
+                    model_name=self.config.retrieval.cross_encoder_model,
+                    instruction=self.config.retrieval.rerank_instruction,
+                    device=ce_device,
+                    trust_remote_code=self.config.retrieval.trust_remote_code,
+                    fusion_weight=self.config.retrieval.rerank_fusion_weight,
+                    telemetry=self.telemetry,
+                )
+            else:
+                from .reranker import CrossEncoderReranker
+                self._cross_encoder = CrossEncoderReranker(
+                    model_name=self.config.retrieval.cross_encoder_model,
+                    device=ce_device,
+                    trust_remote_code=self.config.retrieval.trust_remote_code,
+                    fusion_weight=self.config.retrieval.rerank_fusion_weight,
+                    telemetry=self.telemetry,
+                )
 
         # LLM / Basic retriever
         self.retriever = Retriever(
@@ -390,6 +421,7 @@ class Ragi:
             bm25_index=self._bm25_index,
             on_the_fly_index=self._on_the_fly_index,
             step_back=self._step_back,
+            think_then_retrieve=self._think_then_retrieve,
             auto_merge_parents=self.config.retrieval.auto_merge_parents,
             context_ordering=self.config.retrieval.context_ordering,
             prune_unreferenced_citations=self.config.retrieval.prune_unreferenced_citations,
@@ -744,11 +776,17 @@ class FilteredRagi:
         self._ragi = ragi
         self._filters = filters
 
+    def _sample_rate(self) -> float:
+        cfg = getattr(self._ragi, "config", None)
+        tel = getattr(cfg, "telemetry", None)
+        rate = getattr(tel, "sample_rate", 1.0)
+        return float(rate) if isinstance(rate, (int, float)) else 1.0
+
     def ask(self, query: str, top_k: int = 5, system_prompt: Optional[str] = None) -> Answer:
         from .telemetry import request_context
         with request_context(
             entry_point="filtered_api",
-            sample_rate=self._ragi.config.telemetry.sample_rate,
+            sample_rate=self._sample_rate(),
         ):
             return self._ragi._ask_with_filters(query, top_k, system_prompt, self._filters)
 
@@ -756,7 +794,7 @@ class FilteredRagi:
         from .telemetry import request_context
         with request_context(
             entry_point="filtered_api",
-            sample_rate=self._ragi.config.telemetry.sample_rate,
+            sample_rate=self._sample_rate(),
         ):
             return self._ragi._retrieve_with_filters(query, top_k, self._filters)
 

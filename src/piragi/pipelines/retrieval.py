@@ -16,6 +16,7 @@ class RetrievalPipeline:
                  evidence_judge=None, candidate_k=20,
                  auto_merge_parents=True,
                  step_back=None,
+                 think_then_retrieve=None,
                  context_ordering: str = "u_shaped",
                  prune_unreferenced_citations: bool = True,
                  rerank_top_n: Optional[int] = None,
@@ -38,6 +39,7 @@ class RetrievalPipeline:
         self.candidate_k = candidate_k
         self.auto_merge_parents = auto_merge_parents
         self.step_back = step_back
+        self.think_then_retrieve = think_then_retrieve
         self.context_ordering = context_ordering
         self.prune_unreferenced_citations = prune_unreferenced_citations
         self.rerank_top_n = rerank_top_n
@@ -296,8 +298,8 @@ class RetrievalPipeline:
         """
         from ..types import Citation
 
-        # Validate query
-        if not query or not query.strip():
+        # Validate query and bounds
+        if not query or not query.strip() or top_k <= 0:
             return []
 
         tel = self._get_telemetry()
@@ -318,21 +320,33 @@ class RetrievalPipeline:
 
             # Determine queries to use for retrieval
             query_variations = [query]
-            if self.step_back or self.hyde:
+            reasoned_lexical_query = query
+            if self.step_back or self.hyde or self.think_then_retrieve:
                 with tel.span("query.transform", operation="query_transform", provider="local"):
                     if self.step_back:
                         try:
                             sb_queries = self.step_back.get_queries(query)
-                            query_variations = sb_queries
+                            query_variations = list(sb_queries)
                         except Exception as e:
                             logger.warning("Step-back prompting failed: {}, using original query".format(e))
                             query_variations = [query]
+
+                    if self.think_then_retrieve:
+                        try:
+                            ttr_queries = self.think_then_retrieve.get_queries(query)
+                            for tq in ttr_queries:
+                                if tq not in query_variations:
+                                    query_variations.append(tq)
+                            if len(ttr_queries) > 1:
+                                reasoned_lexical_query = "{} {}".format(query, ttr_queries[1])
+                        except Exception as e:
+                            logger.warning("ThinkThenRetrieve failed: {}, using original query".format(e))
 
                     if self.hyde:
                         try:
                             hypothetical_doc = self.hyde.transform_query(query)
                             if len(query_variations) > 1:
-                                query_variations = [hypothetical_doc, query_variations[1]]
+                                query_variations = [hypothetical_doc] + query_variations[1:]
                             else:
                                 query_variations = [hypothetical_doc]
                             logger.debug("HyDE generated: {}...".format(hypothetical_doc[:100]))
@@ -351,7 +365,9 @@ class RetrievalPipeline:
             if self.hybrid_searcher:
                 try:
                     with tel.span("search.hybrid", operation="hybrid_fusion", provider="bm25", topK=search_top_k):
-                        all_citations = self._hybrid_search(query, all_citations, search_top_k, filters)
+                        all_citations = self._hybrid_search(
+                            reasoned_lexical_query, all_citations, search_top_k, filters
+                        )
                 except Exception as e:
                     logger.warning("Hybrid search failed: {}".format(e))
 
@@ -466,6 +482,7 @@ class RetrievalPipeline:
                 return answer
 
             stepback_query = None
+            reasoned_lexical_query = query
             with tel.span("query.transform", operation="query_transform", provider="local"):
                 if self.step_back:
                     try:
@@ -474,6 +491,16 @@ class RetrievalPipeline:
                             stepback_query = sb.strip()
                     except Exception as e:
                         logger.warning("Step-back generation failed: {}".format(e))
+
+                ttr_extra_queries = []
+                if self.think_then_retrieve:
+                    try:
+                        ttr_qs = self.think_then_retrieve.get_queries(query)
+                        ttr_extra_queries = [q for q in ttr_qs if q != query]
+                        if ttr_extra_queries:
+                            reasoned_lexical_query = "{} {}".format(query, ttr_extra_queries[0])
+                    except Exception as e:
+                        logger.warning("ThinkThenRetrieve failed in ask(): {}".format(e))
 
                 # Determine queries to use for retrieval
                 if self.hyde:
@@ -492,6 +519,10 @@ class RetrievalPipeline:
                 if stepback_query and stepback_query not in query_variations:
                     query_variations.append(stepback_query)
 
+                for tq in ttr_extra_queries:
+                    if tq not in query_variations:
+                        query_variations.append(tq)
+
             # Get more candidates if we're using cross-encoder reranking
             context_k = max(top_k, self.candidate_k) if self.evidence_judge else top_k
             if self.cross_encoder:
@@ -505,7 +536,9 @@ class RetrievalPipeline:
             if self.hybrid_searcher:
                 try:
                     with tel.span("search.hybrid", operation="hybrid_fusion", provider="bm25", topK=search_top_k):
-                        all_citations = self._hybrid_search(query, all_citations, search_top_k, filters)
+                        all_citations = self._hybrid_search(
+                            reasoned_lexical_query, all_citations, search_top_k, filters
+                        )
                 except Exception as e:
                     logger.warning("Hybrid search failed: {}".format(e))
                     # Continue with vector-only results

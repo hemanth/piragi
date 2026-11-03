@@ -474,3 +474,89 @@ General question:"""
         """
         stepback = self.generate_stepback_query(query)
         return [query, stepback]
+
+
+class ThinkThenRetrieve:
+    """
+    Reasoning-before-retrieval query synthesis for reasoning-intensive IR (BRIGHT / TheoremQA).
+
+    Identifies the underlying problem, derives relevant theorems, mechanisms, or APIs
+    step by step, and emits a dense hypothesis trace fused alongside the original query.
+    """
+
+    def __init__(
+        self,
+        model: str = "llama3.2",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        domain: Optional[str] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 512,
+        llm_client=None,
+    ) -> None:
+        import os
+
+        self.domain = domain
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model = llm_client.model
+            self.client = getattr(llm_client, "client", None)
+        else:
+            self.model = model
+            if base_url is None:
+                base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")
+            if api_key is None:
+                api_key = os.getenv("LLM_API_KEY", "not-needed")
+
+            from .llm_client import LLMClient
+            self.llm_client = LLMClient(model=model, api_key=api_key, base_url=base_url)
+            self.client = self.llm_client.client
+
+    def build_prompt(self, query: str) -> str:
+        """Build the structured Think-Then-Retrieve prompt."""
+        clean_query = query.replace("\n", " ").strip()
+        domain_hint = " ({})".format(self.domain) if self.domain else ""
+        return (
+            "{}\n\n"
+            "Instructions{}:\n"
+            "1. Identify the essential underlying problem, theorem, or mechanism.\n"
+            "2. Think step by step to reason and describe what authoritative definitions, "
+            "principles, algorithms, or evidence passages are needed to address it in detail.\n"
+            "3. Draft a concise technical synthesis naming exact domain concepts and terminology."
+        ).format(clean_query, domain_hint)
+
+    def reason(self, query: str) -> str:
+        """Generate a reasoning trace and conceptual retrieval hypothesis for a query."""
+        if not query or not query.strip():
+            return query
+        prompt = self.build_prompt(query)
+        try:
+            response = self.llm_client.complete(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert retrieval reasoner. Identify the core mechanism, "
+                            "theorem, or technical concept needed to answer the problem."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            content = (response.choices[0].message.content or "").strip()
+            return content if content else query
+        except Exception as e:
+            logger.warning("ThinkThenRetrieve failed: {}, using original query".format(e))
+            return query
+
+    def get_queries(self, query: str) -> List[str]:
+        """Return [original_query, reasoning_hypothesis] (deduplicated on fallback)."""
+        reasoned = self.reason(query)
+        if reasoned and reasoned.strip() and reasoned.strip() != query.strip():
+            return [query, reasoned.strip()]
+        return [query]

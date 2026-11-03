@@ -41,9 +41,21 @@ from .decisions import DecisionEngine, DecisionQuestion, DecisionResult, SemIfDe
 from .pipelines.ingestion import IngestionPipeline
 
 # Advanced components (optional imports)
-from .reranker import CrossEncoderReranker, TFIDFReranker, HybridReranker
+from .reranker import (
+    CrossEncoderReranker,
+    TFIDFReranker,
+    HybridReranker,
+    CausalLLMReranker,
+    ListwiseReasoningReranker,
+)
 from .hybrid_search import HybridSearcher
-from .query_transform import HyDE, QueryExpander, MultiQueryRetriever, StepBackPrompting
+from .query_transform import (
+    HyDE,
+    QueryExpander,
+    MultiQueryRetriever,
+    StepBackPrompting,
+    ThinkThenRetrieve,
+)
 from .semantic_chunking import (
     SemanticChunker,
     ContextualChunker,
@@ -58,7 +70,7 @@ from .stores import (
     QdrantStore,
 )
 
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 __all__ = [
     # Core
     "Ragi",
@@ -89,6 +101,8 @@ __all__ = [
     "CrossEncoderReranker",
     "TFIDFReranker",
     "HybridReranker",
+    "CausalLLMReranker",
+    "ListwiseReasoningReranker",
     # Hybrid search
     "HybridSearcher",
     # Query transformation
@@ -96,6 +110,7 @@ __all__ = [
     "QueryExpander",
     "MultiQueryRetriever",
     "StepBackPrompting",
+    "ThinkThenRetrieve",
     # Chunking strategies
     "SemanticChunker",
     "ContextualChunker",

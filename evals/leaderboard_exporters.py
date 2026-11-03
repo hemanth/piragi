@@ -148,8 +148,46 @@ def optimize_for_leaderboard(benchmark: str) -> Dict[str, Any]:
             ),
         }
 
+    if key in ("bright", "brightbenchmark", "brightretrieval"):
+        return {
+            "benchmark": "bright",
+            "description": "BRIGHT: Reasoning-intensive retrieval with Think-Then-Retrieve CoT + Hybrid RRF + Listwise Reranking.",
+            "top_k": 100,
+            "rrf_k": 60,
+            "use_think_then_retrieve": True,
+            "use_hybrid_search": True,
+            "use_cross_encoder": True,
+            "reranker_type": "listwise",
+            "retrieval": {
+                "use_think_then_retrieve": True,
+                "use_hybrid_search": True,
+                "use_rrf": True,
+                "use_cross_encoder": True,
+                "reranker_type": "listwise",
+                "rerank_top_n": 100,
+                "rerank_fusion_weight": 0.15,
+                "listwise_window_size": 20,
+                "listwise_step_size": 10,
+                "auto_merge_parents": True,
+                "context_ordering": "u_shaped",
+                "vector_weight": 0.5,
+                "bm25_weight": 0.5,
+            },
+            "chunk": {
+                "strategy": "hierarchical",
+                "parent_size": 2000,
+                "child_size": 400,
+                "overlap": 50,
+            },
+            "rationale": (
+                "BRIGHT queries share minimal surface vocabulary with relevant theorems, code, or scientific proofs. "
+                "Think-Then-Retrieve synthesizes explicit conceptual hypotheses fused via BM25 + dense RRF, followed "
+                "by sliding-window listwise reasoning reranking."
+            ),
+        }
+
     raise ValueError(
-        f"Unknown benchmark: '{benchmark}'. Supported: 'enterpriserag', 'airbench', 'gaia'"
+        "Unknown benchmark: '{}'. Supported: 'enterpriserag', 'airbench', 'gaia', 'bright'".format(benchmark)
     )
 
 

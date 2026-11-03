@@ -94,12 +94,13 @@ def test_single_query_no_parallelism(mock_executor, mock_as_completed):
     retriever = DummyRetriever()
     
     pipeline = RetrievalPipeline(embedder, store, retriever)
-    # Ensure it only uses 1 worker if 1 query
+    # Single query fast-path skips ThreadPoolExecutor overhead completely
     pipeline.retriever.expand_query = Mock(return_value=["q1"])
     
-    pipeline.retrieve("test query")
+    citations = pipeline.retrieve("test query")
     
-    mock_executor.assert_called_once_with(max_workers=1)
+    mock_executor.assert_not_called()
+    assert len(citations) == 2
 
 @patch("piragi.pipelines.retrieval.as_completed")
 @patch("piragi.pipelines.retrieval.ThreadPoolExecutor")

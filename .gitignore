@@ -54,5 +54,8 @@ Thumbs.db
 test_env/
 CLAUDE.md
 .agents/
+node_modules/
 evals/submissions/airbench_2405/*.zip
+evals/submissions/bright/*/*/score.json
+evals/results/bright_cache/
 evals/results/openjev-*/

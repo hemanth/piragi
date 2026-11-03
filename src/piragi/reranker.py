@@ -394,3 +394,453 @@ class HybridReranker:
             return final_results
 
         return stage1_results[:top_k] if top_k else stage1_results
+
+
+def sanitize_passage_brackets(text: str) -> str:
+    """Replace numeric bracket references like [12] with (12) so listwise IDs stay unambiguous."""
+    import re
+
+    return re.sub(r"\[(\d+)\]", r"(\1)", text or "")
+
+
+def parse_listwise_ranking(raw_output: str, num_candidates: int) -> List[int]:
+    """
+    Parse RankGPT / ReasonRank listwise output into a complete 0-indexed permutation.
+
+    Handles `<think>...</think><answer>[3] > [1] > [2]</answer>`, `<answer>...</answer>`,
+    ties (`[3] > [1] = [2]`), out-of-range IDs, duplicates, and missing IDs (appended in
+    original relative order so no candidate is ever dropped).
+    """
+    import re
+
+    if num_candidates <= 0:
+        return []
+
+    text = raw_output or ""
+    ans_match = re.search(r"<answer>(.*?)</answer>", text, flags=re.DOTALL | re.IGNORECASE)
+    if ans_match:
+        target = ans_match.group(1)
+    elif "</think>" in text:
+        target = text.split("</think>", 1)[1]
+    else:
+        target = text
+
+    found_one_based = [int(m) for m in re.findall(r"\[(\d+)\]", target)]
+    if not found_one_based:
+        found_one_based = [int(m) for m in re.findall(r"\b(\d+)\b", target)]
+
+    seen = set()
+    ordered: List[int] = []
+    for idx_1 in found_one_based:
+        idx_0 = idx_1 - 1
+        if 0 <= idx_0 < num_candidates and idx_0 not in seen:
+            seen.add(idx_0)
+            ordered.append(idx_0)
+
+    for idx_0 in range(num_candidates):
+        if idx_0 not in seen:
+            ordered.append(idx_0)
+
+    return ordered
+
+
+class CausalLLMReranker:
+    """
+    Instruction-aware causal LLM Yes/No logit reranker (Qwen3-Reranker & BGE-Gemma).
+
+    Scores (instruction, query, document) in a single forward pass without autoregressive
+    decoding overhead, using length-sorted batching and optional Stage-1 score blending.
+    """
+
+    DEFAULT_INSTRUCTION = (
+        "Given a reasoning-intensive search query, retrieve relevant passages, theorems, "
+        "or documentation that help answer the query"
+    )
+    GEMMA_PROMPT = (
+        "Given a query A and a passage B, determine whether the passage contains an answer "
+        "to the query by providing a prediction of either 'Yes' or 'No'."
+    )
+
+    def __init__(
+        self,
+        model_name: str = "Qwen/Qwen3-Reranker-4B",
+        instruction: Optional[str] = None,
+        device: Optional[str] = None,
+        batch_size: int = 16,
+        max_length: int = 1024,
+        trust_remote_code: bool = True,
+        fusion_weight: float = 0.0,
+        telemetry: Optional[object] = None,
+    ) -> None:
+        self.model_name = model_name
+        self.instruction = instruction or self.DEFAULT_INSTRUCTION
+        self._device = device
+        self.batch_size = batch_size
+        self.max_length = max_length
+        self._trust_remote_code = trust_remote_code
+        self.fusion_weight = fusion_weight
+        self._telemetry = telemetry
+        self._tokenizer = None
+        self._model = None
+
+    def _is_qwen3_style(self) -> bool:
+        lower = self.model_name.lower()
+        return "qwen3-reranker" in lower or "qwen3_reranker" in lower
+
+    def format_qwen3_pair(self, query: str, doc: str, instruction: Optional[str] = None) -> str:
+        inst = instruction or self.instruction
+        return "<Instruct>: {}\n<Query>: {}\n<Document>: {}".format(inst, query, doc)
+
+    def _resolve_device(self) -> str:
+        if self._device:
+            return self._device
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
+
+    def _load_model(self):
+        if self._model is None:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
+            dev = self._resolve_device()
+            if dev == "cuda" and torch.cuda.is_bf16_supported():
+                dtype = torch.bfloat16
+            elif dev in ("cuda", "mps"):
+                dtype = torch.float16
+            else:
+                dtype = torch.float32
+
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                padding_side="left",
+                trust_remote_code=self._trust_remote_code,
+            )
+            if self._tokenizer.pad_token is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
+
+            self._model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                torch_dtype=dtype,
+                trust_remote_code=self._trust_remote_code,
+            ).to(dev)
+            self._model.eval()
+        return self._tokenizer, self._model
+
+    def _score_pairs(self, query: str, passages: List[str], instruction: Optional[str] = None) -> List[float]:
+        import numpy as np
+        import torch
+
+        tokenizer, model = self._load_model()
+        dev = next(model.parameters()).device
+
+        order = sorted(range(len(passages)), key=lambda idx: len(passages[idx]))
+        sorted_passages = [passages[idx] for idx in order]
+        sorted_scores = np.zeros(len(passages), dtype=np.float64)
+
+        if self._is_qwen3_style():
+            prefix = (
+                "<|im_start|>system\nJudge whether the Document meets the requirements based on "
+                "the Query and the Instruct provided. Note that the answer can only be \"yes\" "
+                "or \"no\".<|im_end|>\n<|im_start|>user\n"
+            )
+            suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+            prefix_ids = tokenizer.encode(prefix, add_special_tokens=False)
+            suffix_ids = tokenizer.encode(suffix, add_special_tokens=False)
+            yes_id = tokenizer.convert_tokens_to_ids("yes")
+            no_id = tokenizer.convert_tokens_to_ids("no")
+            budget = max(64, self.max_length - len(prefix_ids) - len(suffix_ids))
+
+            for start in range(0, len(sorted_passages), self.batch_size):
+                batch_docs = sorted_passages[start : start + self.batch_size]
+                formatted = [self.format_qwen3_pair(query, d, instruction=instruction) for d in batch_docs]
+                enc = tokenizer(
+                    formatted,
+                    padding=False,
+                    truncation="longest_first",
+                    return_attention_mask=False,
+                    max_length=budget,
+                )
+                enc["input_ids"] = [prefix_ids + ids + suffix_ids for ids in enc["input_ids"]]
+                padded = tokenizer.pad(enc, padding=True, return_tensors="pt")
+                padded = {k: v.to(dev) for k, v in padded.items()}
+                with torch.inference_mode():
+                    logits = model(**padded, use_cache=False).logits[:, -1, :]
+                    pair_logits = torch.stack([logits[:, no_id], logits[:, yes_id]], dim=1)
+                    probs = torch.nn.functional.log_softmax(pair_logits.float(), dim=1)[:, 1].exp()
+                sorted_scores[start : start + len(batch_docs)] = probs.cpu().numpy()
+        else:
+            yes_id = tokenizer("Yes", add_special_tokens=False)["input_ids"][0]
+            sep_ids = tokenizer("\n", return_tensors=None, add_special_tokens=False)["input_ids"]
+            prompt_ids = tokenizer(self.GEMMA_PROMPT, return_tensors=None, add_special_tokens=False)["input_ids"]
+            bos = [tokenizer.bos_token_id] if tokenizer.bos_token_id is not None else []
+            q_ids = tokenizer(
+                "A: {}".format(query),
+                return_tensors=None,
+                add_special_tokens=False,
+                max_length=(self.max_length * 3) // 4,
+                truncation=True,
+            )["input_ids"]
+
+            for start in range(0, len(sorted_passages), self.batch_size):
+                batch_docs = sorted_passages[start : start + self.batch_size]
+                items = []
+                for doc in batch_docs:
+                    p_ids = tokenizer(
+                        "B: {}".format(doc),
+                        return_tensors=None,
+                        add_special_tokens=False,
+                        max_length=self.max_length,
+                        truncation=True,
+                    )["input_ids"]
+                    ids = bos + q_ids + sep_ids + p_ids + sep_ids + prompt_ids
+                    items.append({"input_ids": ids, "attention_mask": [1] * len(ids)})
+                padded = tokenizer.pad(items, padding=True, return_tensors="pt")
+                padded = {k: v.to(dev) for k, v in padded.items()}
+                with torch.inference_mode():
+                    raw = model(**padded, use_cache=False).logits[:, -1, yes_id].float()
+                    probs = torch.sigmoid(torch.clamp(raw, -50.0, 50.0))
+                sorted_scores[start : start + len(batch_docs)] = probs.cpu().numpy()
+
+        restored = np.empty(len(passages), dtype=np.float64)
+        for pos, orig_idx in enumerate(order):
+            restored[orig_idx] = sorted_scores[pos]
+        return restored.tolist()
+
+    def rerank(
+        self,
+        query: str,
+        citations: List[Citation],
+        top_k: Optional[int] = None,
+        fusion_weight: Optional[float] = None,
+        instruction: Optional[str] = None,
+    ) -> List[Citation]:
+        import numpy as np
+        from .telemetry import get_telemetry
+
+        if not citations or len(citations) == 1:
+            return citations[:top_k] if top_k is not None else citations
+
+        tel = self._telemetry if self._telemetry is not None else get_telemetry()
+        with tel.span(
+            "rerank.causal_llm",
+            operation="rerank",
+            provider="causal_llm",
+            candidateCount=len(citations),
+            topK=top_k if top_k is not None else len(citations),
+        ):
+            probs = np.asarray(
+                self._score_pairs(query, [c.chunk for c in citations], instruction=instruction),
+                dtype=np.float64,
+            )
+            blend = self.fusion_weight if fusion_weight is None else float(fusion_weight)
+            if blend > 0.0:
+                stage1 = np.asarray([float(c.score) for c in citations], dtype=np.float64)
+                s_min, s_max = float(np.min(stage1)), float(np.max(stage1))
+                if s_max > s_min:
+                    s_norm = (stage1 - s_min) / (s_max - s_min)
+                else:
+                    ranks = np.arange(1.0, len(citations) + 1.0)
+                    s_norm = (1.0 / (60.0 + ranks)) / (1.0 / 61.0)
+                probs = (1.0 - blend) * probs + blend * s_norm
+
+            scored = [
+                Citation(
+                    source=c.source,
+                    chunk=c.chunk,
+                    score=float(sc),
+                    metadata=c.metadata,
+                )
+                for c, sc in zip(citations, probs)
+            ]
+            scored.sort(key=lambda c: c.score, reverse=True)
+            return scored[:top_k] if top_k is not None else scored
+
+
+class ListwiseReasoningReranker:
+    """
+    Sliding-window listwise reasoning reranker (ReasonRank / RankLLM compatible).
+
+    Jointly compares windows of candidate passages using explicit step-by-step
+    `<think>...</think><answer>[i] > [j] ...</answer>` comparative reasoning,
+    progressing bottom-up so deep relevant passages bubble into top-K.
+    """
+
+    SYSTEM_PROMPT_REASONING = (
+        "You are RankLLM, an intelligent assistant that can rank passages based on their "
+        "relevance to the query. Given a query and a passage list, you first thinks about "
+        "the reasoning process in the mind and then provides the answer (i.e., the reranked "
+        "passage list). The reasoning process and answer are enclosed within <think> </think> "
+        "and <answer> </answer> tags, respectively, i.e., <think> reasoning process here "
+        "</think> <answer> answer here </answer>."
+    )
+
+    def __init__(
+        self,
+        llm_client=None,
+        model_name: Optional[str] = None,
+        window_size: int = 20,
+        step_size: int = 10,
+        max_passage_chars: int = 1200,
+        max_tokens: int = 1536,
+        fusion_weight: float = 0.0,
+        device: Optional[str] = None,
+        telemetry: Optional[object] = None,
+    ) -> None:
+        self.llm_client = llm_client
+        self.model_name = model_name
+        self.window_size = max(2, int(window_size))
+        self.step_size = max(1, int(step_size))
+        self.max_passage_chars = max_passage_chars
+        self.max_tokens = max_tokens
+        self.fusion_weight = fusion_weight
+        self._device = device
+        self._telemetry = telemetry
+        self._hf_tokenizer = None
+        self._hf_model = None
+
+    def build_messages(self, query: str, window_passages: List[str]) -> List[dict]:
+        """Construct exact ReasonRank / RankGPT_reasoning chat messages."""
+        clean_q = sanitize_passage_brackets(query).strip()
+        num = len(window_passages)
+        lines = [
+            "I will provide you with {} passages, each indicated by a numerical identifier []. "
+            "Rank the passages based on their relevance to the search query: {}.".format(num, clean_q),
+            "",
+        ]
+        for idx, passage in enumerate(window_passages, start=1):
+            clipped = sanitize_passage_brackets(passage.strip())[: self.max_passage_chars]
+            clipped = " ".join(clipped.split())
+            lines.append("[{}] {}".format(idx, clipped))
+
+        lines.append(
+            "Search Query: {}.\nRank the {} passages above based on their relevance to the search query. "
+            "All the passages should be included and listed using identifiers, in descending order of "
+            "relevance. The format of the answer should be [] > [], e.g., [2] > [1].".format(clean_q, num)
+        )
+        return [
+            {"role": "system", "content": self.SYSTEM_PROMPT_REASONING},
+            {"role": "user", "content": "\n".join(lines)},
+        ]
+
+    def _generate_window_ranking(self, messages: List[dict]) -> str:
+        if self.llm_client is not None:
+            resp = self.llm_client.complete(
+                messages=messages,
+                temperature=0.0,
+                max_tokens=self.max_tokens,
+            )
+            return (resp.choices[0].message.content or "").strip()
+
+        if not self.model_name:
+            raise ValueError("Either llm_client or model_name must be provided to ListwiseReasoningReranker")
+
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        if self._hf_model is None:
+            dev = self._device or ("cuda" if torch.cuda.is_available() else "cpu")
+            dtype = torch.bfloat16 if (dev == "cuda" and torch.cuda.is_bf16_supported()) else torch.float32
+            self._hf_tokenizer = AutoTokenizer.from_pretrained(self.model_name, trust_remote_code=True)
+            if self._hf_tokenizer.pad_token is None:
+                self._hf_tokenizer.pad_token = self._hf_tokenizer.eos_token
+            self._hf_model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                torch_dtype=dtype,
+                trust_remote_code=True,
+            ).to(dev)
+            self._hf_model.eval()
+
+        prompt = self._hf_tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        dev = next(self._hf_model.parameters()).device
+        enc = self._hf_tokenizer([prompt], return_tensors="pt").to(dev)
+        with torch.inference_mode():
+            out_ids = self._hf_model.generate(
+                **enc,
+                max_new_tokens=self.max_tokens,
+                do_sample=False,
+                pad_token_id=self._hf_tokenizer.pad_token_id,
+            )
+        gen_tokens = out_ids[0, enc["input_ids"].shape[1] :]
+        return self._hf_tokenizer.decode(gen_tokens, skip_special_tokens=True)
+
+    def _sliding_windows(self, n: int) -> List[Tuple[int, int]]:
+        """Compute bottom-up [start, end) windows covering n candidates."""
+        if n <= self.window_size:
+            return [(0, n)]
+        windows: List[Tuple[int, int]] = []
+        end = n
+        while end > 0:
+            start = max(0, end - self.window_size)
+            windows.append((start, end))
+            if start == 0:
+                break
+            end -= self.step_size
+        return windows
+
+    def rerank(
+        self,
+        query: str,
+        citations: List[Citation],
+        top_k: Optional[int] = None,
+        fusion_weight: Optional[float] = None,
+    ) -> List[Citation]:
+        from .telemetry import get_telemetry
+
+        if not citations or len(citations) == 1:
+            return citations[:top_k] if top_k is not None else citations
+
+        tel = self._telemetry if self._telemetry is not None else get_telemetry()
+        with tel.span(
+            "rerank.listwise",
+            operation="rerank",
+            provider="listwise_llm",
+            candidateCount=len(citations),
+            topK=top_k if top_k is not None else len(citations),
+        ):
+            working = list(citations)
+            for start, end in self._sliding_windows(len(working)):
+                sub = working[start:end]
+                if len(sub) <= 1:
+                    continue
+                try:
+                    msgs = self.build_messages(query, [c.chunk for c in sub])
+                    raw_text = self._generate_window_ranking(msgs)
+                    perm = parse_listwise_ranking(raw_text, len(sub))
+                    working[start:end] = [sub[i] for i in perm]
+                except Exception as exc:
+                    logger.warning("Listwise window [{}:{}] failed: {}".format(start, end, exc))
+
+            blend = self.fusion_weight if fusion_weight is None else float(fusion_weight)
+            orig_rank_map = {(c.source, c.chunk): r for r, c in enumerate(citations, start=1)}
+
+            n_total = float(len(working))
+            scored: List[Citation] = []
+            for new_rank, c in enumerate(working, start=1):
+                listwise_score = 1.0 - (float(new_rank - 1) / max(1.0, n_total))
+                if blend > 0.0:
+                    orig_rank = orig_rank_map.get((c.source, c.chunk), new_rank)
+                    rrf_new = 1.0 / (60.0 + float(new_rank))
+                    rrf_old = 1.0 / (60.0 + float(orig_rank))
+                    final_score = (1.0 - blend) * rrf_new + blend * rrf_old
+                else:
+                    final_score = listwise_score
+                scored.append(
+                    Citation(
+                        source=c.source,
+                        chunk=c.chunk,
+                        score=float(final_score),
+                        metadata=c.metadata,
+                    )
+                )
+
+            scored.sort(key=lambda c: c.score, reverse=True)
+            return scored[:top_k] if top_k is not None else scored

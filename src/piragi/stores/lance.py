@@ -181,7 +181,7 @@ class LanceStore:
         min_chunk_length: int = 0,
     ) -> List[Citation]:
         """Search for similar chunks."""
-        if self.table is None:
+        if self.table is None or top_k <= 0:
             return []
 
         search_limit = top_k * 3

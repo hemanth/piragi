@@ -68,14 +68,19 @@ class RetrievalConfig(BaseModel):
     use_cross_encoder: bool = False
     use_query_rewrite: bool = False
     use_step_back: bool = False
+    use_think_then_retrieve: bool = False
     vector_weight: float = 0.5
     bm25_weight: float = 0.5
     use_rrf: bool = True
+    reranker_type: Literal["cross_encoder", "causal_llm", "listwise"] = "cross_encoder"
     cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     cross_encoder_device: Optional[str] = None
+    rerank_instruction: Optional[str] = None
     trust_remote_code: bool = False
     rerank_top_n: Optional[int] = Field(default=None, ge=1)
     rerank_fusion_weight: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
+    listwise_window_size: int = Field(default=20, ge=2)
+    listwise_step_size: int = Field(default=10, ge=1)
     context_ordering: Literal["u_shaped", "descending"] = "u_shaped"
     prune_unreferenced_citations: bool = True
     auto_merge_parents: bool = True

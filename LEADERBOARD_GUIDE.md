@@ -1,8 +1,8 @@
 # Piragi RAG Agent Leaderboard Submission & Optimization Guide
 
-**Document Version**: 1.0.0  
-**Framework**: Piragi SOTA RAG (v0.1.0)  
-**Evaluation Reference**: `BENCHMARK_REPORT.md`  
+**Document Version**: 1.3.0  
+**Framework**: Piragi SOTA RAG (v1.3.0)  
+**Evaluation Reference**: `BENCHMARK_REPORT.md` & `evals/results/bright_live_summary.json`  
 **Generated Artifacts Directory**: `evals/submissions/`  
 **Automated Exporter Module**: `evals/leaderboard_exporters.py`
 
@@ -77,6 +77,50 @@ Piragi targets three premier, active evaluation platforms representing the state
   - **Multi-Hop Reasoning Coherence**: Verifiable step-by-step reasoning traces.
   - **Evidence Grounding**: Identification of supporting authoritative source documents.
 - **Piragi Advantage**: StepBack query expansion paired with hierarchical parent chunk synthesis enables reliable completion of Level 2 and Level 3 multi-hop reasoning questions.
+
+### 2.4 BRIGHT (`xlangai/BRIGHT` — ICLR 2025 Reasoning-Intensive Retrieval Benchmark)
+- **Official Leaderboard**: [https://brightbenchmark.github.io/](https://brightbenchmark.github.io/)
+- **Dataset Repository**: [https://huggingface.co/datasets/xlangai/BRIGHT](https://huggingface.co/datasets/xlangai/BRIGHT) (`12` reasoning domains, `1,384` queries, `1,145,164` unique corpus documents, strict `excluded_ids` leakage masking)
+- **Live GPU Runner**: [`evals/run_bright_live.py`](evals/run_bright_live.py) | **Full Summary & 95% CIs**: [`evals/results/bright_live_summary.json`](evals/results/bright_live_summary.json)
+
+#### Verified Full 12-Split Ablation Ladder (`B = 1,000` Bootstrap 95% CIs)
+
+| Condition / Pipeline | Reasoning Trace | Macro `NDCG@10` | 95% Bootstrap CI | Macro `Recall@10` | Macro `Recall@100` | Macro `MRR` |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **`A_baseline_bm25`** | Raw query | `11.35%` | `[10.67%, 13.21%]` | `13.51%` | `32.36%` | `16.25%` |
+| **`B_piragi_raw_hybrid_sota`** | Raw query (no CoT) | **`27.23%`** | `[26.27%, 29.76%]` | `33.45%` | `69.21%` | `33.53%` |
+| **`C_piragi_local_ttr_stage1_hybrid_prf`** | Open-weights `Qwen2.5-7B-Instruct` (`ThinkThenRetrieve`) | **`31.43%`** | `[30.14%, 33.81%]` | `37.02%` | `70.82%` | `38.42%` |
+| **`D_piragi_local_ttr_stage2_dual_causal_rerank`** | Open-weights `Qwen2.5-7B-Instruct` + Dual Causal Rerank | **`30.93%`** | `[29.66%, 33.44%]` | `36.44%` | `70.82%` | `38.24%` |
+| **`C_piragi_official_cot_stage1_hybrid_prf`** | Standardized BRIGHT `gpt4_reason` CoT | **`32.61%`** | `[31.01%, 34.67%]` | **`37.85%`** | **`71.98%`** | **`40.19%`** |
+| **`D_piragi_official_cot_stage2_dual_causal_rerank`** | Standardized BRIGHT `gpt4_reason` + Dual Causal Rerank | **`31.35%`** | `[30.11%, 33.78%]` | `37.17%` | `71.98%` | `38.80%` |
+
+#### Comparison vs Published BRIGHT (ICLR 2025) Baselines (`NDCG@10` Macro-Average)
+- **BM25 (`11.35%` local CSR / `14.5%` Pyserini)**: **`+21.26 pts` (`2.87x` local BM25)**
+- **GritLM-7B + GPT-4 CoT (`~25.0%`)**: **`+7.61 pts`**
+- **E5-Mistral-7B + GPT-4 CoT (`~26.3%`)**: **`+6.31 pts`**
+- **Qwen1.5-7B + GPT-4 CoT (`~27.8%`)**: **`+4.81 pts`**
+- **OpenAI `text-embedding-3-large` + GPT-4 CoT (`~28.3%`)**: **`+4.31 pts`**
+- **Google `Gecko-1B` + GPT-4 CoT (`~29.1%`)**: **`+3.51 pts`** (and **`+2.33 pts`** using 100% open-weights `piragi` `ThinkThenRetrieve` at `31.43%`!)
+
+#### Per-Split Official 12-Domain Breakdown (`NDCG@10 %`)
+
+| Split (`xlangai/BRIGHT`) | `BM25` | `piragi` Raw Hybrid | `piragi` Local TTR (Stage-1) | `piragi` Local TTR (Stage-2) | `piragi` Official CoT (Stage-1) | `piragi` Official CoT (Stage-2) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`biology`** | `9.34` | `25.96` | `38.24` | `33.40` | **`38.89`** | `34.31` |
+| **`earth_science`** | `11.47` | `34.52` | `38.24` | `35.90` | **`42.28`** | `36.83` |
+| **`economics`** | `12.38` | `27.30` | `29.77` | `26.30` | **`31.06`** | `29.25` |
+| **`psychology`** | `7.54` | `29.62` | `34.74` | `34.76` | **`39.52`** | `36.22` |
+| **`robotics`** | `9.99` | `21.96` | `24.34` | `21.87` | **`25.86`** | `23.81` |
+| **`stackoverflow`** | `17.23` | `26.84` | `29.95` | `28.12` | **`30.88`** | `29.17` |
+| **`sustainable_living`** | `9.50` | `24.18` | `28.47` | **`28.78`** | `27.48` | `27.62` |
+| **`pony`** | `10.71` | `12.82` | `14.81` | `21.18` | **`23.34`** | `23.10` |
+| **`leetcode`** | `26.38` | **`42.26`** | `41.41` | `40.40` | `41.57` | `40.11` |
+| **`aops`** | `5.80` | `14.29` | **`14.56`** | `14.29` | `13.45` | `13.19` |
+| **`theoremqa_theorems`** | `4.94` | `31.72` | `42.28` | **`44.90`** | `40.97` | `42.33` |
+| **`theoremqa_questions`** | `10.92` | `35.27` | `40.37` | **`41.24`** | `35.97` | `40.30` |
+| **Macro Average (`12` Splits)** | **`11.35`** | **`27.23`** | **`31.43`** | **`30.93`** | **`32.61`** | **`31.35`** |
+
+> **Architectural Takeaway**: On theorem-proving and niche programming DSL splits (`pony` `14.81% -> 21.18%`, `theoremqa_theorems` `42.28% -> 44.90%` [`9.1x` BM25], `theoremqa_questions` `35.97% -> 40.30%`), Stage-2 pointwise causal LLM reranking (`CausalLLMReranker` raw log-odds + Rank-RRF) adds `+2.6` to `+6.4` `NDCG@10` pts, whereas on multi-document StackExchange synthesis (`biology`, `earth_science`, `psychology`), Stage-1B's BRIGHT-specialized `BAAI/bge-reasoner-embed-qwen3-8b-0923` + Rocchio PRF directly peaks at **`32.61%` Macro `NDCG@10`**.
 
 ---
 
@@ -173,6 +217,29 @@ answer = kb.ask("Solve multi-hop assistant task", top_k=preset["top_k"])
   - `chunk.strategy = "hierarchical"` (`parent_size=2000`, `child_size=400`, `overlap=50`)
 - **Query Execution Parameter (`preset["top_k"]`)**:
   - `top_k = 10` (passed to `kb.ask(query, top_k=preset["top_k"])`)
+
+### 4.4 BRIGHT Benchmark Preset
+```python
+from evals.leaderboard_exporters import optimize_for_leaderboard
+from piragi import Ragi
+
+preset = optimize_for_leaderboard("bright")
+kb = Ragi("./documents", config={
+    "chunk": preset["chunk"],
+    "retrieval": preset["retrieval"],
+})
+citations = kb.retrieve("Prove convergence using the Squeeze Theorem", top_k=preset["top_k"])
+```
+- **Index / Retrieval Configuration (`preset["retrieval"]`)**:
+  - `retrieval.use_think_then_retrieve = True`
+  - `retrieval.use_hybrid_search = True`
+  - `retrieval.use_rrf = True`
+  - `retrieval.use_cross_encoder = True`
+  - `retrieval.reranker_type = "causal_llm"` (`Qwen/Qwen3-Reranker-4B` or `"listwise"` `liuwenhan/reasonrank-7B`)
+  - `retrieval.auto_merge_parents = True`
+  - `retrieval.context_ordering = "u_shaped"`
+- **Retrieval Execution Parameter (`preset["top_k"]`)**:
+  - `top_k = 100` (official BRIGHT `NDCG@10` / `Recall@100` evaluation depth)
 
 ---
 

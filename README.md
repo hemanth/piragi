@@ -9,7 +9,7 @@ kb = Ragi(["./docs", "s3://bucket/data/**/*.pdf", "https://api.example.com/docs"
 answer = kb.ask("How do I deploy this?")
 ```
 
-Built-in vector store, embeddings, citations, and auto-updates. Free & local by default. Ranked **#1 Overall** on the live [AIR-Bench 24.05 Long-Doc Leaderboard](https://huggingface.co/spaces/AIR-Bench/leaderboard) (`84.96%` Recall@10, `75.72%` nDCG@10, `80.10%` MRR@10 — [details](LEADERBOARD_GUIDE.md)).
+Built-in vector store, embeddings, citations, and auto-updates. Free & local by default. Ranked **#1 Overall** on the live [AIR-Bench 24.05 Long-Doc Leaderboard](https://huggingface.co/spaces/AIR-Bench/leaderboard) (`84.96%` Recall@10, `75.72%` nDCG@10, `80.10%` MRR@10) and **`32.61%` Macro `NDCG@10` (`2.87x` BM25; `71.98%` Recall@100)** across all 12 splits of [BRIGHT (`xlangai/BRIGHT`, ICLR 2025)](https://brightbenchmark.github.io/) (`31.43%` fully open-weights — [details](LEADERBOARD_GUIDE.md)).
 
 ## Installation
 
@@ -142,9 +142,22 @@ kb = Ragi("./docs", store=SupabaseStore(url="https://xxx.supabase.co", key="..."
 ```python
 kb = Ragi("./docs", config={
     "retrieval": {
-        "use_hyde": True,           # Hypothetical document embeddings
-        "use_hybrid_search": True,  # BM25 + vector search
-        "use_cross_encoder": True,  # Neural reranking
+        "use_hyde": True,                  # Hypothetical document embeddings
+        "use_hybrid_search": True,         # BM25 + vector search (RRF)
+        "use_cross_encoder": True,         # Neural reranking
+    }
+})
+
+# Reasoning-Intensive Retrieval (BRIGHT-grade multi-hop theorem/code search)
+kb_reason = Ragi("./docs", config={
+    "retrieval": {
+        "use_think_then_retrieve": True,   # Pre-retrieval CoT decomposition
+        "use_hybrid_search": True,
+        "use_rrf": True,
+        "use_cross_encoder": True,
+        "reranker_type": "causal_llm",     # "cross_encoder" | "causal_llm" | "listwise"
+        "cross_encoder_model": "Qwen/Qwen3-Reranker-4B",
+        "rerank_instruction": "Retrieve passages providing foundational theorems or APIs.",
     }
 })
 ```

@@ -1,0 +1,129 @@
+[BRIGHT] Device=cuda | Dtype=torch.bfloat16 | Tasks=12 | Reasoning=both | Listwise=False
+[Data] biology              | queries= 103 | docs=  57359 | corpus_fp=0e36703c4c5229ce
+[Data] earth_science        | queries= 116 | docs= 121249 | corpus_fp=06cdbe5dababc1fa
+[Data] economics            | queries= 103 | docs=  50220 | corpus_fp=bd8ea7b9d53cb39f
+[Data] psychology           | queries= 101 | docs=  52835 | corpus_fp=becdda8812d35b53
+[Data] robotics             | queries= 101 | docs=  61961 | corpus_fp=7b76f5b95a10a294
+[Data] stackoverflow        | queries= 117 | docs= 107081 | corpus_fp=63b1e4a099ba6ffc
+[Data] sustainable_living   | queries= 108 | docs=  60792 | corpus_fp=a12d2c6e741f9ae7
+[Data] pony                 | queries= 112 | docs=   7894 | corpus_fp=11fdb686a0a49070
+[Data] leetcode             | queries= 142 | docs= 413932 | corpus_fp=6a7a2ff4573818f8
+[Data] aops                 | queries= 111 | docs= 188002 | corpus_fp=1321bb2ffbee17e9
+[Data] theoremqa_theorems   | queries=  76 | docs=  23839 | corpus_fp=ee472f1442f5fd7c
+[Data] theoremqa_questions  | queries= 194 | docs= 188002 | corpus_fp=1321bb2ffbee17e9
+[Stage-0] Loaded cached local ThinkThenRetrieve traces from evals/results/bright_cache/local_think_then_retrieve.json
+[BM25-CSR] Indexed & scored biology (57359 docs) in 3.2s
+[BM25-CSR] Indexed & scored earth_science (121249 docs) in 6.0s
+[BM25-CSR] Indexed & scored economics (50220 docs) in 3.0s
+[BM25-CSR] Indexed & scored psychology (52835 docs) in 3.2s
+[BM25-CSR] Indexed & scored robotics (61961 docs) in 2.9s
+[BM25-CSR] Indexed & scored stackoverflow (107081 docs) in 14.9s
+[BM25-CSR] Indexed & scored sustainable_living (60792 docs) in 3.4s
+[BM25-CSR] Indexed & scored pony (7894 docs) in 0.7s
+[BM25-CSR] Indexed & scored leetcode (413932 docs) in 44.7s
+[BM25-CSR] Indexed & scored aops,theoremqa_questions (188002 docs) in 25.4s
+[BM25-CSR] Indexed & scored theoremqa_theorems (23839 docs) in 2.2s
+[Stage-1A] Loading full-corpus dense model BAAI/bge-large-en-v1.5...
+`torch_dtype` is deprecated! Use `dtype` instead!
+  [bge_large] Encoded 57359 docs (fp=0e36703c4c5229ce) in 132.0s
+  [bge_large] Encoded 121249 docs (fp=06cdbe5dababc1fa) in 519.8s
+  [bge_large] Encoded 50220 docs (fp=bd8ea7b9d53cb39f) in 146.9s
+  [bge_large] Encoded 52835 docs (fp=becdda8812d35b53) in 150.7s
+  [bge_large] Encoded 61961 docs (fp=7b76f5b95a10a294) in 136.8s
+  [bge_large] Encoded 107081 docs (fp=63b1e4a099ba6ffc) in 518.5s
+  [bge_large] Encoded 60792 docs (fp=a12d2c6e741f9ae7) in 175.2s
+  [bge_large] Loaded cached embeddings for 11fdb686a0a49070 (7894, 1024)
+  [bge_large] Encoded 413932 docs (fp=6a7a2ff4573818f8) in 2501.2s
+  [bge_large] Encoded 188002 docs (fp=1321bb2ffbee17e9) in 1210.6s
+  [bge_large] Encoded 23839 docs (fp=ee472f1442f5fd7c) in 142.3s
+[Stage-1A] Loading instruction-aware Qwen/Qwen3-Embedding-0.6B...
+  [qwen3_06b] Encoded full 57359 docs (fp=0e36703c4c5229ce) in 433.6s
+  [qwen3_06b] Encoded shortlist 23463/121249 docs (fp=06cdbe5dababc1fa) in 247.0s
+  [qwen3_06b] Encoded full 50220 docs (fp=bd8ea7b9d53cb39f) in 484.3s
+  [qwen3_06b] Encoded full 52835 docs (fp=becdda8812d35b53) in 438.8s
+  [qwen3_06b] Encoded full 61961 docs (fp=7b76f5b95a10a294) in 422.9s
+  [qwen3_06b] Encoded shortlist 42678/107081 docs (fp=63b1e4a099ba6ffc) in 1080.1s
+  [qwen3_06b] Encoded full 60792 docs (fp=a12d2c6e741f9ae7) in 605.6s
+  [qwen3_06b] Loaded full cached embeddings for 11fdb686a0a49070 (7894, 1024)
+  [qwen3_06b] Encoded shortlist 28012/413932 docs (fp=6a7a2ff4573818f8) in 755.4s
+  [qwen3_06b] Encoded shortlist 103093/188002 docs (fp=1321bb2ffbee17e9) in 2605.5s
+  [qwen3_06b] Encoded full 23839 docs (fp=ee472f1442f5fd7c) in 446.1s
+[Stage-1B] Loading 8B specialist BAAI/bge-reasoner-embed-qwen3-8b-0923...
+Loading checkpoint shards:   0%|          | 0/7 [00:00<?, ?it/s]Loading checkpoint shards:  14%|█▍        | 1/7 [00:15<01:31, 15.17s/it]Loading checkpoint shards:  29%|██▊       | 2/7 [00:29<01:14, 14.94s/it]Loading checkpoint shards:  43%|████▎     | 3/7 [00:44<00:59, 14.86s/it]Loading checkpoint shards:  57%|█████▋    | 4/7 [01:00<00:45, 15.03s/it]Loading checkpoint shards:  71%|███████▏  | 5/7 [01:14<00:29, 14.93s/it]Loading checkpoint shards:  86%|████████▌ | 6/7 [01:29<00:14, 14.88s/it]Loading checkpoint shards: 100%|██████████| 7/7 [01:32<00:00, 10.98s/it]Loading checkpoint shards: 100%|██████████| 7/7 [01:32<00:00, 13.21s/it]
+  [BGE-Reasoner-8B] biology                      | union_pool= 21137/ 57359 docs | 1080.6s
+  [BGE-Reasoner-8B] earth_science                | union_pool= 17472/121249 docs | 1136.8s
+  [BGE-Reasoner-8B] economics                    | union_pool= 16018/ 50220 docs | 1760.8s
+  [BGE-Reasoner-8B] psychology                   | union_pool= 16571/ 52835 docs | 1451.6s
+  [BGE-Reasoner-8B] robotics                     | union_pool= 15630/ 61961 docs | 1201.2s
+  [BGE-Reasoner-8B] stackoverflow                | union_pool= 27485/107081 docs | 4639.8s
+  [BGE-Reasoner-8B] sustainable_living           | union_pool= 19636/ 60792 docs | 1716.1s
+  [BGE-Reasoner-8B] leetcode                     | union_pool= 14118/413932 docs | 2398.6s
+  [BGE-Reasoner-8B] aops,theoremqa_questions     | union_pool= 66655/188002 docs | 10941.1s
+  [BGE-Reasoner-8B] theoremqa_theorems           | union_pool= 11769/ 23839 docs | 1745.8s
+[Stage-2A] Scoring top candidates with Qwen/Qwen3-Reranker-4B...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  5.13it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  4.98it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  5.00it/s]
+You're using a Qwen2TokenizerFast tokenizer. Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
+  [Qwen3-Reranker] piragi_local_ttr/biology (2575 pairs) in 289.8s
+  [Qwen3-Reranker] piragi_official_cot/biology (2575 pairs) in 291.2s
+  [Qwen3-Reranker] piragi_local_ttr/earth_science (2900 pairs) in 354.2s
+  [Qwen3-Reranker] piragi_official_cot/earth_science (2900 pairs) in 355.5s
+  [Qwen3-Reranker] piragi_local_ttr/economics (2575 pairs) in 395.4s
+  [Qwen3-Reranker] piragi_official_cot/economics (2575 pairs) in 399.3s
+  [Qwen3-Reranker] piragi_local_ttr/psychology (2525 pairs) in 379.0s
+  [Qwen3-Reranker] piragi_official_cot/psychology (2525 pairs) in 379.0s
+  [Qwen3-Reranker] piragi_local_ttr/robotics (2525 pairs) in 353.7s
+  [Qwen3-Reranker] piragi_official_cot/robotics (2525 pairs) in 360.9s
+  [Qwen3-Reranker] piragi_local_ttr/stackoverflow (2925 pairs) in 470.5s
+  [Qwen3-Reranker] piragi_official_cot/stackoverflow (2925 pairs) in 470.3s
+  [Qwen3-Reranker] piragi_local_ttr/sustainable_living (2700 pairs) in 357.9s
+  [Qwen3-Reranker] piragi_official_cot/sustainable_living (2700 pairs) in 356.6s
+  [Qwen3-Reranker] piragi_local_ttr/pony (2800 pairs) in 331.3s
+  [Qwen3-Reranker] piragi_official_cot/pony (2800 pairs) in 334.9s
+  [Qwen3-Reranker] piragi_local_ttr/leetcode (3550 pairs) in 603.3s
+  [Qwen3-Reranker] piragi_official_cot/leetcode (3550 pairs) in 611.8s
+  [Qwen3-Reranker] piragi_local_ttr/aops (2775 pairs) in 451.1s
+  [Qwen3-Reranker] piragi_official_cot/aops (2775 pairs) in 447.8s
+  [Qwen3-Reranker] piragi_local_ttr/theoremqa_theorems (1900 pairs) in 286.4s
+  [Qwen3-Reranker] piragi_official_cot/theoremqa_theorems (1900 pairs) in 285.3s
+  [Qwen3-Reranker] piragi_local_ttr/theoremqa_questions (4850 pairs) in 788.9s
+  [Qwen3-Reranker] piragi_official_cot/theoremqa_questions (4850 pairs) in 781.6s
+[Stage-2B] Scoring top candidates with BAAI/bge-reranker-v2-gemma...
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]Loading checkpoint shards:  33%|███▎      | 1/3 [00:14<00:29, 14.99s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:30<00:15, 15.13s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:30<00:00,  8.39s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:30<00:00, 10.20s/it]
+You're using a GemmaTokenizerFast tokenizer. Please note that with a fast tokenizer, using the `__call__` method is faster than using a method to encode the text followed by a call to the `pad` method to get a padded encoding.
+  [Gemma-Reranker] piragi_local_ttr/biology (2575 pairs) in 117.8s
+  [Gemma-Reranker] piragi_official_cot/biology (2575 pairs) in 119.0s
+  [Gemma-Reranker] piragi_local_ttr/earth_science (2900 pairs) in 144.9s
+  [Gemma-Reranker] piragi_official_cot/earth_science (2900 pairs) in 145.0s
+  [Gemma-Reranker] piragi_local_ttr/economics (2575 pairs) in 159.1s
+  [Gemma-Reranker] piragi_official_cot/economics (2575 pairs) in 160.9s
+  [Gemma-Reranker] piragi_local_ttr/psychology (2525 pairs) in 154.7s
+  [Gemma-Reranker] piragi_official_cot/psychology (2525 pairs) in 153.9s
+  [Gemma-Reranker] piragi_local_ttr/robotics (2525 pairs) in 144.5s
+  [Gemma-Reranker] piragi_official_cot/robotics (2525 pairs) in 146.6s
+  [Gemma-Reranker] piragi_local_ttr/stackoverflow (2925 pairs) in 188.2s
+  [Gemma-Reranker] piragi_official_cot/stackoverflow (2925 pairs) in 188.6s
+  [Gemma-Reranker] piragi_local_ttr/sustainable_living (2700 pairs) in 147.6s
+  [Gemma-Reranker] piragi_official_cot/sustainable_living (2700 pairs) in 148.8s
+  [Gemma-Reranker] piragi_local_ttr/pony (2800 pairs) in 142.0s
+  [Gemma-Reranker] piragi_official_cot/pony (2800 pairs) in 144.7s
+  [Gemma-Reranker] piragi_local_ttr/leetcode (3550 pairs) in 240.1s
+  [Gemma-Reranker] piragi_official_cot/leetcode (3550 pairs) in 241.4s
+  [Gemma-Reranker] piragi_local_ttr/aops (2775 pairs) in 181.7s
+  [Gemma-Reranker] piragi_official_cot/aops (2775 pairs) in 181.7s
+  [Gemma-Reranker] piragi_local_ttr/theoremqa_theorems (1900 pairs) in 116.0s
+  [Gemma-Reranker] piragi_official_cot/theoremqa_theorems (1900 pairs) in 115.5s
+  [Gemma-Reranker] piragi_local_ttr/theoremqa_questions (4850 pairs) in 318.2s
+  [Gemma-Reranker] piragi_official_cot/theoremqa_questions (4850 pairs) in 316.2s
+
+============================================================================================
+OFFICIAL BRIGHT BENCHMARK SUMMARY (Macro-Average NDCG@10 Across 12 Splits)
+============================================================================================
+A_baseline_bm25                            | NDCG@10= 11.35% (95% CI [10.67, 13.21]) | R@10= 13.51% | R@100= 32.36%
+B_piragi_raw_hybrid_sota                   | NDCG@10= 27.23% (95% CI [26.27, 29.76]) | R@10= 33.45% | R@100= 69.21%
+C_piragi_local_ttr_stage1_hybrid_prf       | NDCG@10= 31.43% (95% CI [30.14, 33.81]) | R@10= 37.02% | R@100= 70.82%
+D_piragi_local_ttr_stage2_dual_causal_rerank | NDCG@10= 30.93% (95% CI [29.66, 33.44]) | R@10= 36.44% | R@100= 70.82%
+C_piragi_official_cot_stage1_hybrid_prf    | NDCG@10= 32.61% (95% CI [31.01, 34.67]) | R@10= 37.85% | R@100= 71.98%
+D_piragi_official_cot_stage2_dual_causal_rerank | NDCG@10= 31.35% (95% CI [30.11, 33.78]) | R@10= 37.17% | R@100= 71.98%
+
+[BRIGHT] Saved full summary & CIs to evals/results/bright_live_summary.json
